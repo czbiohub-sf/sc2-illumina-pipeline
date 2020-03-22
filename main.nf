@@ -1,3 +1,38 @@
+def helpMessage() {
+	log.info"""
+
+    Usage:
+
+    The typical command for running the pipeline is as follows:
+
+    nextflow run main.nf --fastqs '*_R{1,2}_001.fastq.gz' --ref reference.fasta --primers primers.bed
+
+    Mandatory arguments:
+      -profile                      Configuration profile to use. Can use multiple (comma separated)
+                                    Available: conda, docker, singularity, awsbatch, test and more.
+      --fastqs                      Path to reads, must be in quotes
+      --primers                     Path to BED file of primers
+      --ref                         Path to FASTA reference sequence
+
+
+    Other options:
+      --outdir                      The output directory where the results will be saved
+      -name                         Name for the pipeline run. If not specified, Nextflow will automatically generate a random mnemonic.
+      -resume                       Use cached results
+
+    AWSBatch options:
+      --awsqueue                    The AWSBatch JobQueue that needs to be set when running on AWSBatch
+      --awsregion                   The AWS Region for your AWS Batch job to run on
+    """.stripIndent()
+}
+
+
+// Show help message
+if (params.help) {
+    helpMessage()
+    exit 0
+}
+
 ch_multiqc_config = file(params.multiqc_config, checkIfExists: true)
 
 Channel
