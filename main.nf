@@ -52,7 +52,9 @@ process trimPrimers {
 
     script:
     """
-    ivar trim -e -i ${alignment} -b ${primer_bed} -p ivar
+    samtools view -F4 -o ivar.bam ${alignment}
+    samtools index ivar.bam
+    ivar trim -e -i ivar.bam -b ${primer_bed} -p ivar
     samtools sort -O bam -o ${sampleName}.primertrimmed.bam ivar.bam
     """
 }
