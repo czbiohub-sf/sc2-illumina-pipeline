@@ -1,6 +1,8 @@
+ch_multiqc_config = file(params.multiqc_config, checkIfExists: true)
+
 Channel
     .fromFilePairs(params.fastqs)
-    .set { reads_ch }
+    .into { reads_ch; fastqc_ch}
 
 ch_fasta = file(params.ref, checkIfExists: true)
 ch_bed = file(params.primers, checkIfExists: true)
@@ -15,10 +17,11 @@ process trimReads {
 
     output:
     tuple(sampleName, file("*_val_*.fq.gz")) into trimmed_ch
+    path("*") into trimmed_reports
 
     script:
     """
-    trim_galore --paired ${reads}
+    trim_galore --fastqc --paired ${reads}
     """
 }
 
@@ -76,5 +79,23 @@ process makeConsensus {
 	"""
 	samtools mpileup -A -d ${params.mpileupDepth} -Q0 ${bam} | 
 	  ivar consensus -q ${params.ivarQualThreshold} -t ${params.ivarFreqThreshold} -m ${params.ivarMinDepth} -n N -p ${sampleName}.primertrimmed.consensus
+	"""
+}
+
+process multiqc {
+	publishDir "${params.outdir}/MultiQC"
+
+	input:
+	path(multiqc_config) from ch_multiqc_config
+	path(trim_galore_results) from trimmed_reports.collect().ifEmpty([])
+
+	output:
+	path("*multiqc_report.html")
+	path("*_data")
+	path("multiqc_plots")
+
+	script:
+	"""
+	multiqc -f --config ${multiqc_config} ${trim_galore_results}
 	"""
 }
