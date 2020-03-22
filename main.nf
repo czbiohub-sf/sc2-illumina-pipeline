@@ -24,7 +24,7 @@ process trimReads {
 
 process alignReads {
     tag { sampleName }
-    publishDir "${params.outdir}"
+    publishDir "${params.outdir}/${sampleName}", mode: "copy"
 
     cpus 4
 
@@ -43,12 +43,14 @@ process alignReads {
 }
 
 process trimPrimers {
+	publishDir "${params.outdir}/${sampleName}", mode: "copy"
+
     input:
     tuple(sampleName, file(alignment)) from aligned_reads
     path(primer_bed) from ch_bed
 
     output:
-    tuple(sampleName, file("${sampleName}.primertrimmed.bam"))
+    tuple(sampleName, file("${sampleName}.primertrimmed.bam")) into trimmed_bam_ch
 
     script:
     """
@@ -57,4 +59,21 @@ process trimPrimers {
     ivar trim -e -i ivar.bam -b ${primer_bed} -p ivar
     samtools sort -O bam -o ${sampleName}.primertrimmed.bam ivar.bam
     """
+}
+
+process makeConsensus {
+	tag { sampleName }
+	publishDir "${params.outdir}/${sampleName}"
+
+	input:
+	tuple(sampleName, path(bam)) from trimmed_bam_ch
+
+	output:
+	tuple(sampleName, path("${sampleName}.primertrimmed.consensus.fa"))
+
+	script:
+	"""
+	samtools mpileup -A -d ${params.mpileupDepth} -Q0 ${bam} | 
+	  ivar consensus -q ${params.ivarQualThreshold} -t ${params.ivarFreqThreshold} -m ${params.ivarMinDepth} -n N -p ${sampleName}.primertrimmed.consensus
+	"""
 }

@@ -1,0 +1,4 @@
+data/raw/*
+results/
+work/
+.nextflow*
