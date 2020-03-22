@@ -1,62 +1,58 @@
 Channel
     .fromFilePairs(params.fastqs)
-    .into { read_files_fastqc; read_files_minimap2 }
+    .set { reads_ch }
 
-ch_fasta = file(params.ref, checkIfExists: true) 
+ch_fasta = file(params.ref, checkIfExists: true)
+ch_bed = file(params.primers, checkIfExists: true)
 
-process fastqc {
-    conda "bioconda::fastqc"
-    publishDir "${params.outdir}", mode: 'copy',
-        saveAs: { filename -> filename.indexOf(".zip") > 0 ? "zips/$filename" : "$filename" }
+process trimReads {
+    tag { sampleName }
 
     cpus 2
 
     input:
-    set val(name), file(reads) from read_files_fastqc
+    tuple(sampleName, file(reads)) from reads_ch
 
     output:
-    file "*_fastqc.{zip,html}" into fastqc_results
+    tuple(sampleName, file("*_val_*.fq.gz")) into trimmed_ch
 
     script:
     """
-    fastqc --quiet --threads $task.cpus $reads
+    trim_galore --paired ${reads}
     """
 }
 
-process minimap2 {
-    conda "bioconda::minimap2 bioconda::samtools"
-    publishDir "${params.outdir}", mode: 'copy'
+process alignReads {
+    tag { sampleName }
+    publishDir "${params.outdir}"
 
     cpus 4
 
     input:
-    tuple(val(name), file(reads)) from read_files_minimap2
+    tuple(sampleName, file(reads)) from trimmed_ch
     path(ref_fasta) from ch_fasta
 
     output:
-    file "*.bam*" into minimap2_results
+    tuple(sampleName, file("*.bam")) into aligned_reads
 
     script:
     """
     minimap2 -ax sr ${ref_fasta} ${reads} |
-      samtools sort -@ 2 -O bam -o ${name}.bam
-    samtools index ${name}.bam
+      samtools sort -@ 2 -O bam -o ${sampleName}.bam
     """
 }
 
-process samtools_flagstat {
-    conda "bioconda::minimap2 bioconda::samtools"
-    publishDir "${params.outdir}", mode: 'copy'
-
-    cpus 1
-
+process trimPrimers {
     input:
-    tuple(path(bam), path(bai)) from minimap2_results
+    tuple(sampleName, file(alignment)) from aligned_reads
+    path(primer_bed) from ch_bed
 
     output:
-    file "*.flagstat" into samtools_flagstat_results
+    tuple(sampleName, file("${sampleName}.primertrimmed.bam"))
 
+    script:
     """
-    samtools flagstat ${bam} > ${bam}.flagstat
+    ivar trim -e -i ${alignment} -b ${primer_bed} -p ivar
+    samtools sort -O bam -o ${sampleName}.primertrimmed.bam ivar.bam
     """
 }
