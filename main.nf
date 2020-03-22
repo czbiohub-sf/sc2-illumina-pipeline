@@ -24,7 +24,7 @@ process trimReads {
 
 process alignReads {
     tag { sampleName }
-    publishDir "${params.outdir}/${sampleName}", mode: "copy"
+    publishDir "${params.outdir}/${sampleName}"
 
     cpus 4
 
@@ -33,7 +33,7 @@ process alignReads {
     path(ref_fasta) from ch_fasta
 
     output:
-    tuple(sampleName, file("*.bam")) into aligned_reads
+    tuple(sampleName, file("${sampleName}.bam")) into aligned_reads
 
     script:
     """
@@ -43,7 +43,8 @@ process alignReads {
 }
 
 process trimPrimers {
-	publishDir "${params.outdir}/${sampleName}", mode: "copy"
+	tag { sampleName }
+	publishDir "${params.outdir}/${sampleName}"
 
     input:
     tuple(sampleName, file(alignment)) from aligned_reads
@@ -56,8 +57,8 @@ process trimPrimers {
     """
     samtools view -F4 -o ivar.bam ${alignment}
     samtools index ivar.bam
-    ivar trim -e -i ivar.bam -b ${primer_bed} -p ivar
-    samtools sort -O bam -o ${sampleName}.primertrimmed.bam ivar.bam
+    ivar trim -e -i ivar.bam -b ${primer_bed} -p ivar.out
+    samtools sort -O bam -o ${sampleName}.primertrimmed.bam ivar.out.bam
     """
 }
 
