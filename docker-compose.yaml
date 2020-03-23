@@ -1,0 +1,5 @@
+version: '3'
+services:
+  sc2-msspe:
+    image: czbiohub/sc2-msspe
+    build: .
