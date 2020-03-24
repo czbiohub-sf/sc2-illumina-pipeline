@@ -1,7 +1,13 @@
-FROM continuumio/miniconda3:latest
+FROM nfcore/base:dev
 LABEL authors="Jack Kamm and Samantha Hao" \
-      description="Docker image containing all requirements for sars-cov-2 MSSPE pipeline"
+      description="Docker image containing all software requirements for the nf-core/msspe pipeline"
 
-COPY environment.yaml /
-RUN /opt/conda/bin/conda env create -f /environment.yaml && /opt/conda/bin/conda clean -a
-ENV PATH /opt/conda/envs/sc2-msspe/bin:$PATH
+# Install the conda environment
+COPY environment.yml /
+RUN conda env create -f /environment.yml && conda clean -a
+
+# Add conda installation dir to PATH (instead of doing 'conda activate')
+ENV PATH /opt/conda/envs/nf-core-msspe-1.0dev/bin:$PATH
+
+# Dump the details of the installed packages to a file for posterity
+RUN conda env export --name nf-core-msspe-1.0dev > nf-core-msspe-1.0dev.yml
