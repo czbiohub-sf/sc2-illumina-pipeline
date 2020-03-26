@@ -52,9 +52,6 @@ if (params.help) {
 }
 
 
-ch_multiqc_config = file(params.multiqc_config, checkIfExists: true)
-
-
 Channel
     .fromFilePairs(params.reads)
     .into { reads_ch; fastqc_ch}
@@ -210,7 +207,7 @@ process get_software_versions {
  * STEP 1 - Trim reads and run FastQC
  */
 process trimReads {
-    tag { sampleName }
+    tag "$sampleName"
 
     cpus 2
 
@@ -232,8 +229,8 @@ process trimReads {
  * STEP 2 - Map sequences to genome
  */
 process alignReads {
-    tag { sampleName }
-    publishDir "${params.outdir}/${sampleName}", mode 'copy'
+    tag "$sampleName"
+    publishDir "${params.outdir}/minimap", mode: 'copy'
 
     cpus 4
 
@@ -255,8 +252,8 @@ process alignReads {
  * STEP 3 - Remove primers from aligned reads
  */
 process trimPrimers {
-	tag { sampleName }
-	publishDir "${params.outdir}/${sampleName}"
+    tag "$sampleName"
+    publishDir "${params.outdir}/ivar", mode: 'copy'
 
     input:
     tuple(sampleName, file(alignment)) from aligned_reads
@@ -278,8 +275,8 @@ process trimPrimers {
  * STEP 3 - Create consensus sequence
  */
 process makeConsensus {
-	tag { sampleName }
-	publishDir "${params.outdir}/${sampleName}"
+	tag "$sampleName"
+	publishDir "${params.outdir}/consensus", mode: 'copy'
 
 	input:
 	tuple(sampleName, path(bam)) from trimmed_bam_ch
@@ -302,7 +299,7 @@ process makeConsensus {
  * STEP 4 - MultiQC
  */
 process multiqc {
-	publishDir "${params.outdir}/MultiQC"
+	publishDir "${params.outdir}/MultiQC", mode: 'copy'
 
 	input:
 	path(multiqc_config) from ch_multiqc_config
@@ -323,31 +320,31 @@ process multiqc {
 /*
  * STEP 2 - MultiQC
  */
-process multiqc {
-    publishDir "${params.outdir}/MultiQC", mode: 'copy'
-
-    input:
-    file (multiqc_config) from ch_multiqc_config
-    file (mqc_custom_config) from ch_multiqc_custom_config.collect().ifEmpty([])
-    // TODO nf-core: Add in log files from your new processes for MultiQC to find!
-    file ('trim_galore/*') from ch_fastqc_results.collect().ifEmpty([])
-    file ('software_versions/*') from ch_software_versions_yaml.collect()
-    file workflow_summary from ch_workflow_summary.collectFile(name: "workflow_summary_mqc.yaml")
-
-    output:
-    file "*multiqc_report.html" into ch_multiqc_report
-    file "*_data"
-    file "multiqc_plots"
-
-    script:
-    rtitle = custom_runName ? "--title \"$custom_runName\"" : ''
-    rfilename = custom_runName ? "--filename " + custom_runName.replaceAll('\\W','_').replaceAll('_+','_') + "_multiqc_report" : ''
-    custom_config_file = params.multiqc_config ? "--config $mqc_custom_config" : ''
-    // TODO nf-core: Specify which MultiQC modules to use with -m for a faster run time
-    """
-    multiqc -f $rtitle $rfilename $custom_config_file . -m fastqc -m trim
-    """
-}
+/*process multiqc {
+#    publishDir "${params.outdir}/MultiQC", mode: 'copy'
+#
+#    input:
+#    file (multiqc_config) from ch_multiqc_config
+#    file (mqc_custom_config) from ch_multiqc_custom_config.collect().ifEmpty([])
+#    // TODO nf-core: Add in log files from your new processes for MultiQC to find!
+#    file ('trim_galore/*') from ch_fastqc_results.collect().ifEmpty([])
+#    file ('software_versions/*') from ch_software_versions_yaml.collect()
+#    file workflow_summary from ch_workflow_summary.collectFile(name: "workflow_summary_mqc.yaml")
+#
+#    output:
+#    file "*multiqc_report.html" into ch_multiqc_report
+#    file "*_data"
+#    file "multiqc_plots"
+#
+#    script:
+#    rtitle = custom_runName ? "--title \"$custom_runName\"" : ''
+#    rfilename = custom_runName ? "--filename " + custom_runName.replaceAll('\\W','_').replaceAll('_+','_') + "_multiqc_report" : ''
+#    custom_config_file = params.multiqc_config ? "--config $mqc_custom_config" : ''
+#    // TODO nf-core: Specify which MultiQC modules to use with -m for a faster run time
+#    """
+#    multiqc -f $rtitle $rfilename $custom_config_file . -m fastqc -m trim
+#    """
+#}*/
 
 /*
  * STEP 3 - Output Description HTML
