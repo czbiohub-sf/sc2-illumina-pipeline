@@ -5,15 +5,19 @@ def helpMessage() {
 
     The typical command for running the pipeline is as follows:
 
-    nextflow run main.nf --fastqs '*_R{1,2}_001.fastq.gz' --ref reference.fasta --primers primers.bed
+    nextflow run main.nf --reads '*_R{1,2}_001.fastq.gz' --ref reference.fasta --primers primers.bed
 
     Mandatory arguments:
       -profile                      Configuration profile to use. Can use multiple (comma separated)
                                     Available: conda, docker, singularity, awsbatch, test and more.
-      --fastqs                      Path to reads, must be in quotes
+      --reads                      Path to reads, must be in quotes
       --primers                     Path to BED file of primers
       --ref                         Path to FASTA reference sequence
 
+
+    Options:
+      --single_end [bool]             Specifies that the input is single-end reads
+      --skip_trim_adaptors [bool]     Skip trimming of illumina adaptors. (NOTE: this does NOT skip the step for trimming spiked primers)
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -35,9 +39,18 @@ if (params.help) {
 
 ch_multiqc_config = file(params.multiqc_config, checkIfExists: true)
 
-Channel
-    .fromFilePairs(params.fastqs)
-    .into { reads_ch; fastqc_ch}
+if (params.readPaths) {
+    Channel
+        .from(params.readPaths)
+        .map { row -> [ row[0], row[1].each{file(it)} ] }
+        .set {reads_ch}
+} else {
+    Channel
+        .fromFilePairs(params.reads, size: params.single_end ? 1 : 2)
+        .set {reads_ch}
+}
+
+untrimmed_ch = params.skip_trim_adaptors ? Channel.empty() : reads_ch
 
 ch_fasta = file(params.ref, checkIfExists: true)
 ch_bed = file(params.primers, checkIfExists: true)
@@ -48,7 +61,7 @@ process trimReads {
     cpus 2
 
     input:
-    tuple(sampleName, file(reads)) from reads_ch
+    tuple(sampleName, file(reads)) from untrimmed_ch
 
     output:
     tuple(sampleName, file("*_val_*.fq.gz")) into trimmed_ch
@@ -60,6 +73,8 @@ process trimReads {
     """
 }
 
+unaligned_ch = params.skip_trim_adaptors ? reads_ch : trimmed_ch
+
 process alignReads {
     tag { sampleName }
     publishDir "${params.outdir}/${sampleName}"
@@ -67,7 +82,7 @@ process alignReads {
     cpus 4
 
     input:
-    tuple(sampleName, file(reads)) from trimmed_ch
+    tuple(sampleName, file(reads)) from unaligned_ch
     path(ref_fasta) from ch_fasta
 
     output:
@@ -122,7 +137,7 @@ process multiqc {
 
 	input:
 	path(multiqc_config) from ch_multiqc_config
-	path(trim_galore_results) from trimmed_reports.collect().ifEmpty([])
+	path(trim_galore_results) from trimmed_reports.collect()
 
 	output:
 	path("*multiqc_report.html")
