@@ -13,7 +13,7 @@ parser.add_argument('-a', help='assembly FASTA')
 parser.add_argument('-l', help='min length for passing QC')
 args = parser.parse_args()
 
-df = pd.read_csv(quast_file, sep='\t')
+df = pd.read_csv(args.f, sep='\t')
 num_Ns = df.iloc[4, 1]
 
 seqrecords = SeqIO.parse(args.a, 'fasta')
