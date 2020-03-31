@@ -9,3 +9,4 @@ dependencies:
   - samtools=1.9
   - trim-galore=0.6.5
   - multiqc=1.8
+  - quast=5.0.2

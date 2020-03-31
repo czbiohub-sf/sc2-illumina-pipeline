@@ -10,14 +10,15 @@ def helpMessage() {
     Mandatory arguments:
       -profile                      Configuration profile to use. Can use multiple (comma separated)
                                     Available: conda, docker, singularity, awsbatch, test and more.
-      --reads                      Path to reads, must be in quotes
+      --reads                       Path to reads, must be in quotes
       --primers                     Path to BED file of primers
       --ref                         Path to FASTA reference sequence
 
 
     Options:
-      --single_end [bool]             Specifies that the input is single-end reads
-      --skip_trim_adaptors [bool]     Skip trimming of illumina adaptors. (NOTE: this does NOT skip the step for trimming spiked primers)
+      --single_end [bool]           Specifies that the input is single-end reads
+      --skip_trim_adaptors [bool]   Skip trimming of illumina adaptors. (NOTE: this does NOT skip the step for trimming spiked primers)
+      --genes                       GFF (2 or 3)/BED for QUAST
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -43,17 +44,21 @@ if (params.readPaths) {
     Channel
         .from(params.readPaths)
         .map { row -> [ row[0], row[1].each{file(it)} ] }
-        .set {reads_ch}
+        .set {reads_ch; quast_reads}
 } else {
     Channel
         .fromFilePairs(params.reads, size: params.single_end ? 1 : 2)
-        .set {reads_ch}
+        .set {reads_ch; quast_reads}
 }
 
 untrimmed_ch = params.skip_trim_adaptors ? Channel.empty() : reads_ch
 
 ch_fasta = file(params.ref, checkIfExists: true)
 ch_bed = file(params.primers, checkIfExists: true)
+
+// Set up files for QUAST
+quast_ref = file(params.ref, checkIfExists: true)
+quast_genes = params.genes ? file(params.genes, checkIfExists: true) : Channel.empty() 
 
 process trimReads {
     tag { sampleName }
@@ -123,7 +128,7 @@ process makeConsensus {
 	tuple(sampleName, path(bam)) from trimmed_bam_ch
 
 	output:
-	tuple(sampleName, path("${sampleName}.primertrimmed.consensus.fa"))
+	tuple(sampleName, path("${sampleName}.primertrimmed.consensus.fa")) into quast_ch
 
 	script:
 	"""
@@ -132,20 +137,50 @@ process makeConsensus {
 	"""
 }
 
+process quast {
+	tag { sampleName }
+	publishDir "${params.outdir}/QUAST/${sampleName}", mode: 'copy'
+
+	input:
+	tuple(sampleName, path(assembly)) from quast_ch
+	path(quast_ref)
+    path(quast_genes)
+	path(reads) from quast_reads
+
+	output:
+    // Avoid name clash with other samples for MultiQC
+    path("${sampleName}_quast/*")
+    path("${sampleName}_quast/report.tsv") into multiqc_quast
+
+    script:
+    if (params.genes)
+    """
+    quast -o ${sampleName}_quast -r ${quast_ref} -g ${quast_genes} -t ${task.cpus} \
+    -1 ${reads[0]} -2 ${reads[1]} 
+    """
+
+    else
+    """
+    quast -o ${sampleName}_quast -r ${quast_ref} -t ${task.cpus} \
+    -1 ${reads[0]} -2 ${reads[1]}
+    """
+}
+
 process multiqc {
 	publishDir "${params.outdir}/MultiQC"
 
-	input:
-	path(multiqc_config) from ch_multiqc_config
-	path(trim_galore_results) from trimmed_reports.collect()
+    input:
+    path(multiqc_config) from ch_multiqc_config
+    path(trim_galore_results) from trimmed_reports.collect()
+    path(quast_results) from multiqc_quast.collect()
 
-	output:
-	path("*multiqc_report.html")
-	path("*_data")
-	path("multiqc_plots")
+    output:
+    path("*multiqc_report.html")
+    path("*_data")
+    path("multiqc_plots")
 
 	script:
 	"""
-	multiqc -f --config ${multiqc_config} ${trim_galore_results}
+	multiqc -f --config ${multiqc_config} ${trim_galore_results}  ${quast_results}
 	"""
 }
