@@ -14,12 +14,12 @@ parser.add_argument('-l', help='min length for passing QC', type=int, default=29
 args = parser.parse_args()
 
 df = pd.read_csv(args.file, sep='\t')
-num_Ns = df.iloc[4, 1][0]
+num_Ns = df.iloc[4, 1]
 
 seqrecords = SeqIO.parse(args.assembly, 'fasta')
 seq_length = sum(len(s) for s in seqrecords)
 
 if num_Ns <= args.n and seq_length >= args.l:
-	shutil.copy(args.a, 'passed_QC/')
+	shutil.copy(args.assembly, 'passed_QC/')
 else:
-	shutil.copy(args.a, 'failed_QC/')
+	shutil.copy(args.assembly, 'failed_QC/')
