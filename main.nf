@@ -44,11 +44,11 @@ if (params.readPaths) {
     Channel
         .from(params.readPaths)
         .map { row -> [ row[0], row[1].each{file(it)} ] }
-        .set {reads_ch; quast_reads}
+        .into {reads_ch; quast_reads}
 } else {
     Channel
         .fromFilePairs(params.reads, size: params.single_end ? 1 : 2)
-        .set {reads_ch; quast_reads}
+        .into {reads_ch; quast_reads}
 }
 
 untrimmed_ch = params.skip_trim_adaptors ? Channel.empty() : reads_ch
@@ -139,40 +139,40 @@ process makeConsensus {
 
 process quast {
 	tag { sampleName }
-	publishDir "${params.outdir}/QUAST/${sampleName}", mode: 'copy'
+	publishDir "${params.outdir}/QUAST", mode: 'copy'
 
 	input:
 	tuple(sampleName, path(assembly)) from quast_ch
 	path(quast_ref)
     path(quast_genes)
-	path(reads) from quast_reads
+	tuple(sample, path(reads)) from quast_reads
 
 	output:
     // Avoid name clash with other samples for MultiQC
-    path("${sampleName}_quast/*")
-    path("${sampleName}_quast/report.tsv") into multiqc_quast
+    path("${sampleName}/*")
+    path("${sampleName}/report.tsv") into multiqc_quast
 
     script:
     if (params.genes)
     """
-    quast -o ${sampleName}_quast -r ${quast_ref} -g ${quast_genes} -t ${task.cpus} \
-    -1 ${reads[0]} -2 ${reads[1]} 
+    quast -o ${sampleName} -r ${quast_ref} -g ${quast_genes} -t ${task.cpus} \
+    -1 ${reads[0]} -2 ${reads[1]} $assembly
     """
 
     else
     """
-    quast -o ${sampleName}_quast -r ${quast_ref} -t ${task.cpus} \
-    -1 ${reads[0]} -2 ${reads[1]}
+    quast -o ${sampleName} -r ${quast_ref} -t ${task.cpus} \
+    -1 ${reads[0]} -2 ${reads[1]} $assembly
     """
 }
 
 process multiqc {
-	publishDir "${params.outdir}/MultiQC"
+	publishDir "${params.outdir}/MultiQC", mode: 'copy'
 
     input:
     path(multiqc_config) from ch_multiqc_config
     path(trim_galore_results) from trimmed_reports.collect()
-    path(quast_results) from multiqc_quast.collect()
+    path("quast_results/*/*") from multiqc_quast.collect()
 
     output:
     path("*multiqc_report.html")
@@ -181,6 +181,6 @@ process multiqc {
 
 	script:
 	"""
-	multiqc -f --config ${multiqc_config} ${trim_galore_results}  ${quast_results}
+	multiqc -f --config ${multiqc_config} ${trim_galore_results}  quast_results/
 	"""
 }
