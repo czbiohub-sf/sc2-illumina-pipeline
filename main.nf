@@ -19,6 +19,8 @@ def helpMessage() {
       --single_end [bool]           Specifies that the input is single-end reads
       --skip_trim_adaptors [bool]   Skip trimming of illumina adaptors. (NOTE: this does NOT skip the step for trimming spiked primers)
       --genes                       GFF (2 or 3)/BED for QUAST
+      --maxNs                       Max number of Ns to allow assemblies to pass QC
+      --minLength                   Minimum base pair length to allow assemblies to pass QC
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -82,7 +84,7 @@ unaligned_ch = params.skip_trim_adaptors ? reads_ch : trimmed_ch
 
 process alignReads {
     tag { sampleName }
-    publishDir "${params.outdir}/${sampleName}"
+    publishDir "${params.outdir}/${sampleName}", mode: 'copy'
 
     cpus 4
 
@@ -102,7 +104,7 @@ process alignReads {
 
 process trimPrimers {
 	tag { sampleName }
-	publishDir "${params.outdir}/${sampleName}"
+	publishDir "${params.outdir}/${sampleName}", mode: 'copy'
 
     input:
     tuple(sampleName, file(alignment)) from aligned_reads
@@ -122,7 +124,7 @@ process trimPrimers {
 
 process makeConsensus {
 	tag { sampleName }
-	publishDir "${params.outdir}/${sampleName}"
+	publishDir "${params.outdir}/${sampleName}", mode: 'copy'
 
 	input:
 	tuple(sampleName, path(bam)) from trimmed_bam_ch
@@ -151,6 +153,7 @@ process quast {
     // Avoid name clash with other samples for MultiQC
     path("${sampleName}/*")
     path("${sampleName}/report.tsv") into multiqc_quast
+    tuple(sampleName, path(assembly), path("${sampleName}/report.tsv"), path("${sampleName}/contigs_reports/unaligned_report.tsv")) into sort_assemblies_ch
 
     script:
     if (params.genes)
@@ -164,6 +167,53 @@ process quast {
     quast -o ${sampleName} -r ${quast_ref} -t ${task.cpus} \
     -1 ${reads[0]} -2 ${reads[1]} $assembly
     """
+}
+
+process sortAssemblies {
+    tag {sampleName}
+    publishDir "${params.outdir}/", mode: 'copy'
+
+    input:
+    tuple(sampleName, path(assembly), path(report_tsv), path(unaligned_tsv)) from sort_assemblies_ch
+
+    output:
+    path("passed_QC/*") into (nextstrain_ch, passed_qc_asm)
+    path("failed_QC/*")
+
+    script:
+    """
+    mkdir -p passed_QC
+    mkdir -p failed_QC
+    python3 parse_quast_unaligned_report.py --report ${report_tsv} --unaligned_report ${unaligned_tsv} --assembly ${assembly} -n ${params.maxNs} -l ${params.minLength}
+    """
+}
+
+process combineFiles {
+    publishDir "${params.outdir}/submission_files", mode: 'copy'
+    
+    input:
+    path(asm_files) from passed_qc_asm.collect()
+
+    output:
+    path("combined_sequences.fasta")
+    path("all_sequences/*")
+
+    script:
+    """
+    mkdir -p all_sequences
+    for f in ${asm_files}
+    do
+    cat $f >> combined_sequences.fasta
+    cp $f all_sequences/
+    done
+    """
+}
+
+process makeNextstrainInput {
+    publishDir "${params.outdir}/nextstrain", mode: 'copy'
+
+    input:
+    path(asm_files) from nextstrain_ch
 }
 
 process multiqc {
