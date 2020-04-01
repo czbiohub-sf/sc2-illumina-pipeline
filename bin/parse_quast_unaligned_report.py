@@ -21,5 +21,4 @@ seq_length = int(report_df.iloc[6,1])
 
 if num_Ns <= args.n and seq_length >= args.l:
 	shutil.copy(args.assembly, 'passed_QC/')
-else:
-	shutil.copy(args.assembly, 'failed_QC/')
+
