@@ -18,9 +18,9 @@ def helpMessage() {
     Options:
       --single_end [bool]           Specifies that the input is single-end reads
       --skip_trim_adapters [bool]   Skip trimming of illumina adapters. (NOTE: this does NOT skip the step for trimming spiked primers)
-      --genes                       GFF (2 or 3)/BED for QUAST
       --maxNs                       Max number of Ns to allow assemblies to pass QC
       --minLength                   Minimum base pair length to allow assemblies to pass QC
+      --no_reads_quast              Run QUAST without aligning reads
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -43,10 +43,18 @@ if (params.help) {
 ch_multiqc_config = file(params.multiqc_config, checkIfExists: true)
 
 if (params.readPaths) {
-    Channel
-        .from(params.readPaths)
-        .map { row -> [ row[0], row[1].each{file(it)} ] }
+    if (params.single_end){
+        Channel
+        .fromList(params.readPaths)
+        .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true)] ] }
         .into {reads_ch; quast_reads}
+    } else {
+        Channel
+        .fromList(params.readPaths)
+        .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true), file(row[1][1], checkIfExists: true) ] ] }
+        .into {reads_ch; quast_reads}
+    }
+    
 } else {
     Channel
         .fromFilePairs(params.reads, size: params.single_end ? 1 : 2)
@@ -60,7 +68,6 @@ ch_bed = file(params.primers, checkIfExists: true)
 
 // Set up files for QUAST
 quast_ref = file(params.ref, checkIfExists: true)
-quast_genes = params.genes ? file(params.genes, checkIfExists: true) : Channel.empty() 
 
 process trimReads {
     tag { sampleName }
@@ -73,6 +80,9 @@ process trimReads {
     output:
     tuple(sampleName, file("*_val_*.fq.gz")) into trimmed_ch
     path("*") into trimmed_reports
+
+    when:
+    !params.skip_trim_adapters
 
     script:
     """
@@ -146,7 +156,6 @@ process quast {
 	input:
 	tuple(sampleName, path(assembly)) from quast_ch
 	path(quast_ref)
-    path(quast_genes)
 	tuple(sample, path(reads)) from quast_reads
 
 	output:
@@ -156,22 +165,18 @@ process quast {
     tuple(sampleName, path(assembly), path("${sampleName}/report.tsv")) into sort_assemblies_ch
 
     script:
-    if (params.genes)
+    if (params.no_reads_quast)
     """
-    quast --min-contig 0 -o ${sampleName} -r ${quast_ref} -g ${quast_genes} -t ${task.cpus} \
-    -1 ${reads[0]} -2 ${reads[1]} $assembly
+    quast --min-contig 0 -o ${sampleName} -r ${quast_ref} -t ${task.cpus} $assembly
     """
-
     else
     """
-    quast --min-contig 0 -o ${sampleName} -r ${quast_ref} -t ${task.cpus} \
-    -1 ${reads[0]} -2 ${reads[1]} $assembly
+    quast --min-contig 0 -o ${sampleName} -r ${quast_ref} -t ${task.cpus} -1 ${reads[0]} -2 ${reads[1]} $assembly
     """
 }
 
 process sortAssemblies {
     tag {sampleName}
-    publishDir "${params.outdir}/", mode: 'copy'
 
     input:
     tuple(sampleName, path(assembly), path(report_tsv)) from sort_assemblies_ch
