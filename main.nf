@@ -17,7 +17,7 @@ def helpMessage() {
 
     Options:
       --single_end [bool]           Specifies that the input is single-end reads
-      --skip_trim_adaptors [bool]   Skip trimming of illumina adaptors. (NOTE: this does NOT skip the step for trimming spiked primers)
+      --skip_trim_adapters [bool]   Skip trimming of illumina adapters. (NOTE: this does NOT skip the step for trimming spiked primers)
       --genes                       GFF (2 or 3)/BED for QUAST
       --maxNs                       Max number of Ns to allow assemblies to pass QC
       --minLength                   Minimum base pair length to allow assemblies to pass QC
@@ -53,7 +53,7 @@ if (params.readPaths) {
         .into {reads_ch; quast_reads}
 }
 
-untrimmed_ch = params.skip_trim_adaptors ? Channel.empty() : reads_ch
+untrimmed_ch = params.skip_trim_adapters ? Channel.empty() : reads_ch
 
 ch_fasta = file(params.ref, checkIfExists: true)
 ch_bed = file(params.primers, checkIfExists: true)
@@ -80,7 +80,7 @@ process trimReads {
     """
 }
 
-unaligned_ch = params.skip_trim_adaptors ? reads_ch : trimmed_ch
+unaligned_ch = params.skip_trim_adapters ? reads_ch : trimmed_ch
 
 process alignReads {
     tag { sampleName }
