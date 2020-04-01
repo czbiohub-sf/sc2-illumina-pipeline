@@ -10,14 +10,17 @@ def helpMessage() {
     Mandatory arguments:
       -profile                      Configuration profile to use. Can use multiple (comma separated)
                                     Available: conda, docker, singularity, awsbatch, test and more.
-      --reads                      Path to reads, must be in quotes
+      --reads                       Path to reads, must be in quotes
       --primers                     Path to BED file of primers
       --ref                         Path to FASTA reference sequence
 
 
     Options:
-      --single_end [bool]             Specifies that the input is single-end reads
-      --skip_trim_adaptors [bool]     Skip trimming of illumina adaptors. (NOTE: this does NOT skip the step for trimming spiked primers)
+      --single_end [bool]           Specifies that the input is single-end reads
+      --skip_trim_adapters [bool]   Skip trimming of illumina adapters. (NOTE: this does NOT skip the step for trimming spiked primers)
+      --maxNs                       Max number of Ns to allow assemblies to pass QC
+      --minLength                   Minimum base pair length to allow assemblies to pass QC
+      --no_reads_quast              Run QUAST without aligning reads
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -40,20 +43,31 @@ if (params.help) {
 ch_multiqc_config = file(params.multiqc_config, checkIfExists: true)
 
 if (params.readPaths) {
-    Channel
-        .from(params.readPaths)
-        .map { row -> [ row[0], row[1].each{file(it)} ] }
-        .set {reads_ch}
+    if (params.single_end){
+        Channel
+        .fromList(params.readPaths)
+        .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true)] ] }
+        .into {reads_ch; quast_reads}
+    } else {
+        Channel
+        .fromList(params.readPaths)
+        .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true), file(row[1][1], checkIfExists: true) ] ] }
+        .into {reads_ch; quast_reads}
+    }
+    
 } else {
     Channel
         .fromFilePairs(params.reads, size: params.single_end ? 1 : 2)
-        .set {reads_ch}
+        .into {reads_ch; quast_reads}
 }
 
-untrimmed_ch = params.skip_trim_adaptors ? Channel.empty() : reads_ch
+untrimmed_ch = params.skip_trim_adapters ? Channel.empty() : reads_ch
 
 ch_fasta = file(params.ref, checkIfExists: true)
 ch_bed = file(params.primers, checkIfExists: true)
+
+// Set up files for QUAST
+quast_ref = file(params.ref, checkIfExists: true)
 
 process trimReads {
     tag { sampleName }
@@ -67,17 +81,20 @@ process trimReads {
     tuple(sampleName, file("*_val_*.fq.gz")) into trimmed_ch
     path("*") into trimmed_reports
 
+    when:
+    !params.skip_trim_adapters
+
     script:
     """
     trim_galore --fastqc --paired ${reads}
     """
 }
 
-unaligned_ch = params.skip_trim_adaptors ? reads_ch : trimmed_ch
+unaligned_ch = params.skip_trim_adapters ? reads_ch : trimmed_ch
 
 process alignReads {
     tag { sampleName }
-    publishDir "${params.outdir}/${sampleName}"
+    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
 
     cpus 4
 
@@ -97,7 +114,7 @@ process alignReads {
 
 process trimPrimers {
 	tag { sampleName }
-	publishDir "${params.outdir}/${sampleName}"
+	publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
 
     input:
     tuple(sampleName, file(alignment)) from aligned_reads
@@ -117,13 +134,13 @@ process trimPrimers {
 
 process makeConsensus {
 	tag { sampleName }
-	publishDir "${params.outdir}/${sampleName}"
+	publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
 
 	input:
 	tuple(sampleName, path(bam)) from trimmed_bam_ch
 
 	output:
-	tuple(sampleName, path("${sampleName}.primertrimmed.consensus.fa"))
+	tuple(sampleName, path("${sampleName}.primertrimmed.consensus.fa")) into quast_ch
 
 	script:
 	"""
@@ -132,20 +149,91 @@ process makeConsensus {
 	"""
 }
 
-process multiqc {
-	publishDir "${params.outdir}/MultiQC"
+process quast {
+	tag { sampleName }
+	publishDir "${params.outdir}/QUAST", mode: 'copy'
 
 	input:
-	path(multiqc_config) from ch_multiqc_config
-	path(trim_galore_results) from trimmed_reports.collect()
+	tuple(sampleName, path(assembly)) from quast_ch
+	path(quast_ref)
+	tuple(sample, path(reads)) from quast_reads
 
 	output:
-	path("*multiqc_report.html")
-	path("*_data")
-	path("multiqc_plots")
+    // Avoid name clash with other samples for MultiQC
+    path("${sampleName}/*")
+    path("${sampleName}/report.tsv") into multiqc_quast
+    tuple(sampleName, path(assembly), path("${sampleName}/report.tsv")) into sort_assemblies_ch
+
+    script:
+    if (params.no_reads_quast)
+    """
+    quast --min-contig 0 -o ${sampleName} -r ${quast_ref} -t ${task.cpus} $assembly
+    """
+    else
+    """
+    quast --min-contig 0 -o ${sampleName} -r ${quast_ref} -t ${task.cpus} -1 ${reads[0]} -2 ${reads[1]} $assembly
+    """
+}
+
+process sortAssemblies {
+    tag {sampleName}
+
+    input:
+    tuple(sampleName, path(assembly), path(report_tsv)) from sort_assemblies_ch
+
+    output:
+    path("passed_QC/*") into (nextstrain_ch, passed_qc_asm)
+
+    script:
+    // create placeholder file so nextflow always has an output
+    """
+    mkdir -p passed_QC
+    touch passed_QC/${sampleName}_foo.txt
+    mkdir -p failed_QC
+    parse_quast_unaligned_report.py --report ${report_tsv} --assembly ${assembly} -n ${params.maxNs} -l ${params.minLength}
+    """
+}
+
+process combineFiles {
+    publishDir "${params.outdir}/submission_files", mode: 'copy'
+    
+    input:
+    path(asm_files) from passed_qc_asm.collect()
+
+    output:
+    path("combined_sequences.fasta")
+    path("all_sequences/*")
+
+    script:
+    """
+    mkdir -p all_sequences
+    touch combined_sequences.fasta
+    for f in ${asm_files}
+    do
+    if [[ \$f != *foo.txt* ]]
+    then
+    cat \$f >> combined_sequences.fasta
+    cp \$f all_sequences/
+    fi
+    done
+    """
+}
+
+process multiqc {
+	publishDir "${params.outdir}/MultiQC", mode: 'copy'
+
+    input:
+    path(multiqc_config) from ch_multiqc_config
+    path(trim_galore_results) from trimmed_reports.collect()
+    path("quast_results/*/*") from multiqc_quast.collect()
+
+    output:
+    path("*multiqc_report.html")
+    path("*_data")
+    path("multiqc_plots")
 
 	script:
 	"""
-	multiqc -f --config ${multiqc_config} ${trim_galore_results}
+	multiqc -f --config ${multiqc_config} ${trim_galore_results}  quast_results/
 	"""
 }

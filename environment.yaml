@@ -9,3 +9,7 @@ dependencies:
   - samtools=1.9
   - trim-galore=0.6.5
   - multiqc=1.8
+  - quast=5.0.2
+  - pip:
+    - pandas==1.0.3
+    - biopython==1.76 
