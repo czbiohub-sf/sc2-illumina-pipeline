@@ -84,7 +84,7 @@ unaligned_ch = params.skip_trim_adaptors ? reads_ch : trimmed_ch
 
 process alignReads {
     tag { sampleName }
-    publishDir "${params.outdir}/${sampleName}", mode: 'copy'
+    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
 
     cpus 4
 
@@ -104,7 +104,7 @@ process alignReads {
 
 process trimPrimers {
 	tag { sampleName }
-	publishDir "${params.outdir}/${sampleName}", mode: 'copy'
+	publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
 
     input:
     tuple(sampleName, file(alignment)) from aligned_reads
@@ -124,7 +124,7 @@ process trimPrimers {
 
 process makeConsensus {
 	tag { sampleName }
-	publishDir "${params.outdir}/${sampleName}", mode: 'copy'
+	publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
 
 	input:
 	tuple(sampleName, path(bam)) from trimmed_bam_ch
@@ -178,13 +178,11 @@ process sortAssemblies {
 
     output:
     path("passed_QC/*") into (nextstrain_ch, passed_qc_asm)
-    path("failed_QC/*")
 
     script:
     """
     mkdir -p passed_QC
-    mkdir -p failed_QC
-    python3 parse_quast_unaligned_report.py --report ${report_tsv} --unaligned_report ${unaligned_tsv} --assembly ${assembly} -n ${params.maxNs} -l ${params.minLength}
+    parse_quast_unaligned_report.py --report ${report_tsv} --unaligned_report ${unaligned_tsv} --assembly ${assembly} -n ${params.maxNs} -l ${params.minLength}
     """
 }
 
@@ -203,18 +201,18 @@ process combineFiles {
     mkdir -p all_sequences
     for f in ${asm_files}
     do
-    cat $f >> combined_sequences.fasta
-    cp $f all_sequences/
+    cat \$f >> combined_sequences.fasta
+    cp \$f all_sequences/
     done
     """
 }
 
-process makeNextstrainInput {
-    publishDir "${params.outdir}/nextstrain", mode: 'copy'
-
-    input:
-    path(asm_files) from nextstrain_ch
-}
+//process makeNextstrainInput {
+//    publishDir "${params.outdir}/nextstrain", mode: 'copy'
+//
+//    input:
+//    path(asm_files) from nextstrain_ch
+//}
 
 process multiqc {
 	publishDir "${params.outdir}/MultiQC", mode: 'copy'

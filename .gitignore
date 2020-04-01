@@ -2,3 +2,4 @@ data/raw/*
 results/
 work/
 .nextflow*
+scratch/
