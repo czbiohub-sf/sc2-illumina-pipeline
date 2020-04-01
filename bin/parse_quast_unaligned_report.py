@@ -6,19 +6,19 @@ import argparse
 import shutil
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--unaligned_report', help='quast unaligned_report.tsv')
 parser.add_argument('--report', help='quast report.tsv')
 parser.add_argument('-n', help='max number of Ns to allow', type=int, default=100)
 parser.add_argument('--assembly', help='assembly FASTA')
 parser.add_argument('-l', help='min length for passing QC', type=int, default=29000)
 args = parser.parse_args()
 
-df = pd.read_csv(args.unaligned_report, sep='\t')
-num_Ns = df.iloc[4, 1]
-
 report_df = pd.read_csv(args.report, sep='\t')
-seq_length = int(report_df.iloc[6,1])
+total_length = int(report_df.loc[report_df['Assembly']=="Total length (>= 0 bp)"].iloc[0,1])
+num_Ns = round(float(report_df.loc[report_df['Assembly']=="# N's per 100 kbp"].values[0][1])*(total_length/100000))
+seq_length = total_length - num_Ns
 
 if num_Ns <= args.n and seq_length >= args.l:
 	shutil.copy(args.assembly, 'passed_QC/')
+else:
+    shutil.copy(args.assembly, 'failed_QC/')
 
