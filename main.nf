@@ -153,18 +153,18 @@ process quast {
     // Avoid name clash with other samples for MultiQC
     path("${sampleName}/*")
     path("${sampleName}/report.tsv") into multiqc_quast
-    tuple(sampleName, path(assembly), path("${sampleName}/report.tsv"), path("${sampleName}/contigs_reports/unaligned_report.tsv")) into sort_assemblies_ch
+    tuple(sampleName, path(assembly), path("${sampleName}/report.tsv")) into sort_assemblies_ch
 
     script:
     if (params.genes)
     """
-    quast -o ${sampleName} -r ${quast_ref} -g ${quast_genes} -t ${task.cpus} \
+    quast --min-contig 0 -o ${sampleName} -r ${quast_ref} -g ${quast_genes} -t ${task.cpus} \
     -1 ${reads[0]} -2 ${reads[1]} $assembly
     """
 
     else
     """
-    quast -o ${sampleName} -r ${quast_ref} -t ${task.cpus} \
+    quast --min-contig 0 -o ${sampleName} -r ${quast_ref} -t ${task.cpus} \
     -1 ${reads[0]} -2 ${reads[1]} $assembly
     """
 }
@@ -174,15 +174,18 @@ process sortAssemblies {
     publishDir "${params.outdir}/", mode: 'copy'
 
     input:
-    tuple(sampleName, path(assembly), path(report_tsv), path(unaligned_tsv)) from sort_assemblies_ch
+    tuple(sampleName, path(assembly), path(report_tsv)) from sort_assemblies_ch
 
     output:
     path("passed_QC/*") into (nextstrain_ch, passed_qc_asm)
 
     script:
+    // create placeholder file so nextflow always has an output
     """
     mkdir -p passed_QC
-    parse_quast_unaligned_report.py --report ${report_tsv} --unaligned_report ${unaligned_tsv} --assembly ${assembly} -n ${params.maxNs} -l ${params.minLength}
+    touch passed_QC/${sampleName}_foo.txt
+    mkdir -p failed_QC
+    parse_quast_unaligned_report.py --report ${report_tsv} --assembly ${assembly} -n ${params.maxNs} -l ${params.minLength}
     """
 }
 
@@ -199,20 +202,17 @@ process combineFiles {
     script:
     """
     mkdir -p all_sequences
+    touch combined_sequences.fasta
     for f in ${asm_files}
     do
+    if [[ \$f != *foo.txt* ]]
+    then
     cat \$f >> combined_sequences.fasta
     cp \$f all_sequences/
+    fi
     done
     """
 }
-
-//process makeNextstrainInput {
-//    publishDir "${params.outdir}/nextstrain", mode: 'copy'
-//
-//    input:
-//    path(asm_files) from nextstrain_ch
-//}
 
 process multiqc {
 	publishDir "${params.outdir}/MultiQC", mode: 'copy'
