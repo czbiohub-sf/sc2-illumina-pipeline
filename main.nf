@@ -13,6 +13,9 @@ def helpMessage() {
       --reads                       Path to reads, must be in quotes
       --primers                     Path to BED file of primers
       --ref                         Path to FASTA reference sequence
+      --gisaid_metadata             Path to GISAID metadata from nextstrain
+      --gisaid_sequences            Path to GISAID sequences
+      --sample_date                 Date to input for sample collection
 
 
     Options:
@@ -62,6 +65,10 @@ ch_bed = file(params.primers, checkIfExists: true)
 quast_ref = file(params.ref, checkIfExists: true)
 quast_genes = params.genes ? file(params.genes, checkIfExists: true) : Channel.empty() 
 
+// Set up GISAID files
+gisaid_metadata = file(params.gisaid_metadata, checkIfExists: true)
+gisaid_sequences = file(params.gisaid_sequences, checkIfExists: true)
+
 process trimReads {
     tag { sampleName }
 
@@ -73,6 +80,9 @@ process trimReads {
     output:
     tuple(sampleName, file("*_val_*.fq.gz")) into trimmed_ch
     path("*") into trimmed_reports
+
+    when:
+    !params.skip_trim_adapters
 
     script:
     """
@@ -177,7 +187,7 @@ process sortAssemblies {
     tuple(sampleName, path(assembly), path(report_tsv)) from sort_assemblies_ch
 
     output:
-    path("passed_QC/*") into (nextstrain_ch, passed_qc_asm)
+    path("passed_QC/*") into passed_qc_asm
 
     script:
     // create placeholder file so nextflow always has an output
@@ -196,7 +206,7 @@ process combineFiles {
     path(asm_files) from passed_qc_asm.collect()
 
     output:
-    path("combined_sequences.fasta")
+    path("combined_sequences.fasta") into nextstrain_ch
     path("all_sequences/*")
 
     script:
@@ -212,6 +222,31 @@ process combineFiles {
     fi
     done
     """
+}
+
+process makeNextstrainInput {
+    publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
+
+    input:
+    path(sample_sequences) from nextstrain_ch
+    path(gisaid_sequences)
+    path(gisaid_metadata)
+
+    output:
+    path('metadata.tsv')
+    path('sequences.fasta')
+
+    script:
+    date = new java.util.Date()
+    """
+    make_nextstrain_input.py -pm ${gisaid_metadata} -ns ${sample_sequences} -d ${params.date} \
+    -r North America -c USA -div California -loc San Francisco County -origlab Biohub -sublab Biohub \
+    -subdate $date
+
+    cat ${gisaid_sequences} > sequences.fasta
+    sed '1d' ${sample_sequences} >> sequences.fasta
+    """
+
 }
 
 process multiqc {
