@@ -90,7 +90,6 @@ unaligned_ch = params.skip_trim_adapters ? reads_ch : trimmed_ch
 
 process alignReads {
     tag { sampleName }
-    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
 
     cpus 4
 
