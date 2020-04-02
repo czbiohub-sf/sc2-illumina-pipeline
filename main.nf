@@ -40,7 +40,7 @@ if (params.help) {
     exit 0
 }
 
-ch_multiqc_config = file(params.multiqc_config, checkIfExists: true)
+multiqc_config = file(params.multiqc_config, checkIfExists: true)
 
 if (params.readPaths) {
     if (params.single_end){
@@ -54,7 +54,6 @@ if (params.readPaths) {
         .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true), file(row[1][1], checkIfExists: true) ] ] }
         .into {reads_ch; quast_reads}
     }
-    
 } else {
     Channel
         .fromFilePairs(params.reads, size: params.single_end ? 1 : 2)
@@ -63,11 +62,8 @@ if (params.readPaths) {
 
 untrimmed_ch = params.skip_trim_adapters ? Channel.empty() : reads_ch
 
-ch_fasta = file(params.ref, checkIfExists: true)
-ch_bed = file(params.primers, checkIfExists: true)
-
-// Set up files for QUAST
-quast_ref = file(params.ref, checkIfExists: true)
+ref_fasta = file(params.ref, checkIfExists: true)
+primer_bed = file(params.primers, checkIfExists: true)
 
 process trimReads {
     tag { sampleName }
@@ -100,14 +96,13 @@ process alignReads {
 
     input:
     tuple(sampleName, file(reads)) from unaligned_ch
-    path(ref_fasta) from ch_fasta
 
     output:
     tuple(sampleName, file("${sampleName}.bam")) into aligned_reads
 
     script:
     """
-    minimap2 -ax sr ${ref_fasta} ${reads} |
+    minimap2 -ax sr -R '@RG\\tID:${sampleName}\\tSM:${sampleName}' ${ref_fasta} ${reads} |
       samtools sort -@ 2 -O bam -o ${sampleName}.bam
     """
 }
@@ -118,17 +113,34 @@ process trimPrimers {
 
     input:
     tuple(sampleName, file(alignment)) from aligned_reads
-    path(primer_bed) from ch_bed
 
     output:
     tuple(sampleName, file("${sampleName}.primertrimmed.bam")) into trimmed_bam_ch
+    file("${sampleName}.primertrimmed.bam") into vcf_in_ch
 
     script:
     """
-    samtools view -F4 -o ivar.bam ${alignment}
+    samtools view -F4 -q ${params.samQualThreshold} -o ivar.bam ${alignment}
     samtools index ivar.bam
     ivar trim -e -i ivar.bam -b ${primer_bed} -p ivar.out
     samtools sort -O bam -o ${sampleName}.primertrimmed.bam ivar.out.bam
+    """
+}
+
+trimmed_bam_ch.into { quast_bam; consensus_bam; samtools_stats_in }
+
+process samtoolsStats {
+    tag { sampleName }
+    input:
+    tuple(sampleName, file(in_bam)) from samtools_stats_in
+
+    output:
+    file("${sampleName}.samtools_stats") into samtools_stats_out
+
+
+    script:
+    """
+    samtools stats ${in_bam} > ${sampleName}.samtools_stats
     """
 }
 
@@ -137,85 +149,118 @@ process makeConsensus {
 	publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
 
 	input:
-	tuple(sampleName, path(bam)) from trimmed_bam_ch
+	tuple(sampleName, path(bam)) from consensus_bam
 
 	output:
-	tuple(sampleName, path("${sampleName}.primertrimmed.consensus.fa")) into quast_ch
+	tuple(sampleName, path("${sampleName}.fa")) into quast_ch
+        path("${sampleName}.fa") into merge_fastas_ch
+        path("${sampleName}.stats.json") into stats_ch
+        path("${sampleName}.depths.png")
 
 	script:
 	"""
-	samtools mpileup -A -d ${params.mpileupDepth} -Q0 ${bam} | 
+        samtools index ${bam}
+	samtools mpileup -A -d ${params.mpileupDepth} -Q0 ${bam} |
 	  ivar consensus -q ${params.ivarQualThreshold} -t ${params.ivarFreqThreshold} -m ${params.ivarMinDepth} -n N -p ${sampleName}.primertrimmed.consensus
+        clean_summarize_assembly.py \
+             ${sampleName} \
+             ${sampleName}.primertrimmed.bam \
+             ${sampleName}.primertrimmed.consensus.fa \
+             ${sampleName}
 	"""
 }
 
+process callVariants {
+    publishDir "${params.outdir}", mode: 'copy'
+
+    input:
+    path(in_bam) from vcf_in_ch.collect()
+
+    output:
+    path("combined.vcf") into ch_vcf
+
+    // use theta=.0003, assuming about 10 mutations between 2 random samples
+    script:
+    """
+    bcftools mpileup -f ${ref_fasta} \
+               ${in_bam} |
+          bcftools call --ploidy 1 -m -P 0.0003 -v - > combined.vcf
+    """
+}
+
+process mergeAllAssemblies {
+    publishDir "${params.outdir}", mode: 'copy'
+
+    input:
+    path(in_fasta) from merge_fastas_ch.collect()
+
+    output:
+    path("combined.fa") into merged_assemblies_ch
+
+    script:
+    """
+    cat ${in_fasta} > combined.fa
+    """
+}
+
+process mergeAssemblyStats {
+    publishDir "${params.outdir}", mode: 'copy'
+
+    input:
+    path(in_json) from stats_ch.collect()
+
+    output:
+    path("combined.stats.tsv") into merged_stats_ch
+
+    script:
+    """merge_stats.py ${in_json} > combined.stats.tsv"""
+}
+
+process filterAssemblies {
+    publishDir "${params.outdir}", mode: 'copy'
+
+    input:
+    path(merged_stats) from merged_stats_ch
+    path(merged_assemblies) from merged_assemblies_ch
+    path(vcf) from ch_vcf
+
+    output:
+    path("filtered.stats.tsv")
+    path("filtered.fa")
+    path("filtered.vcf")
+
+    script:
+    """
+    filter_assemblies.py \
+        --vcf ${vcf} \
+        --max_n ${params.maxNs} --min_len ${params.minLength} \
+        --stats ${merged_stats} --fasta ${merged_assemblies} \
+        --out_prefix filtered
+    """
+}
+
 process quast {
-	tag { sampleName }
-	publishDir "${params.outdir}/QUAST", mode: 'copy'
+    tag { sampleName }
+    publishDir "${params.outdir}/QUAST", mode: 'copy'
 
-	input:
-	tuple(sampleName, path(assembly)) from quast_ch
-	path(quast_ref)
-	tuple(sample, path(reads)) from quast_reads
+    input:
+    tuple(sampleName, path(assembly)) from quast_ch
+    tuple(sampleName, path(bam)) from quast_bam
+    tuple(sample, path(reads)) from quast_reads
 
-	output:
+    output:
     // Avoid name clash with other samples for MultiQC
     path("${sampleName}/*")
     path("${sampleName}/report.tsv") into multiqc_quast
-    tuple(sampleName, path(assembly), path("${sampleName}/report.tsv")) into sort_assemblies_ch
 
     script:
     if (params.no_reads_quast)
     """
-    quast --min-contig 0 -o ${sampleName} -r ${quast_ref} -t ${task.cpus} $assembly
+    quast --min-contig 0 -o ${sampleName} -r ${ref_fasta} -t ${task.cpus} --ref-bam ${bam} $assembly
     """
     else
     """
-    quast --min-contig 0 -o ${sampleName} -r ${quast_ref} -t ${task.cpus} -1 ${reads[0]} -2 ${reads[1]} $assembly
-    """
-}
-
-process sortAssemblies {
-    tag {sampleName}
-
-    input:
-    tuple(sampleName, path(assembly), path(report_tsv)) from sort_assemblies_ch
-
-    output:
-    path("passed_QC/*") into (nextstrain_ch, passed_qc_asm)
-
-    script:
-    // create placeholder file so nextflow always has an output
-    """
-    mkdir -p passed_QC
-    touch passed_QC/${sampleName}_foo.txt
-    mkdir -p failed_QC
-    parse_quast_unaligned_report.py --report ${report_tsv} --assembly ${assembly} -n ${params.maxNs} -l ${params.minLength}
-    """
-}
-
-process combineFiles {
-    publishDir "${params.outdir}/submission_files", mode: 'copy'
-    
-    input:
-    path(asm_files) from passed_qc_asm.collect()
-
-    output:
-    path("combined_sequences.fasta")
-    path("all_sequences/*")
-
-    script:
-    """
-    mkdir -p all_sequences
-    touch combined_sequences.fasta
-    for f in ${asm_files}
-    do
-    if [[ \$f != *foo.txt* ]]
-    then
-    cat \$f >> combined_sequences.fasta
-    cp \$f all_sequences/
-    fi
-    done
+    quast --min-contig 0 -o ${sampleName} -r ${ref_fasta} -t ${task.cpus} -1 ${reads[0]} -2 ${reads[1]} --ref-bam ${bam} $assembly
     """
 }
 
@@ -223,9 +268,9 @@ process multiqc {
 	publishDir "${params.outdir}/MultiQC", mode: 'copy'
 
     input:
-    path(multiqc_config) from ch_multiqc_config
-    path(trim_galore_results) from trimmed_reports.collect()
+    path(trim_galore_results) from trimmed_reports.collect().ifEmpty([])
     path("quast_results/*/*") from multiqc_quast.collect()
+    path(samtools_stats) from samtools_stats_out.collect()
 
     output:
     path("*multiqc_report.html")
@@ -234,6 +279,6 @@ process multiqc {
 
 	script:
 	"""
-	multiqc -f --config ${multiqc_config} ${trim_galore_results}  quast_results/
+	multiqc -f --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} quast_results/
 	"""
 }
