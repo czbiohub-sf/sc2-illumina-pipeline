@@ -1,4 +1,4 @@
-#!usr/bin/env python3
+#!/usr/bin/env python3
 
 
 import pandas as pd
@@ -7,6 +7,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--prev_metadata', '-pm', help='Previous metadata to include')
+parser.add_argument('--prev_sequences', '-ps', help='Previous sequences to include')
 parser.add_argument('--new_sequences', '-ns', help='New sample sequences to include')
 parser.add_argument('--date', '-d', help='Date for the samples (e.g. 2020-03-03)')
 parser.add_argument('--region', '-r', help='Region for the samples (e.g. North America)')
@@ -18,8 +19,9 @@ parser.add_argument('--div_exposure', '-divexp', help='Division exposure (defaul
 parser.add_argument('--originating_lab', '-origlab', help='Originating lab (e.g. Biohub)')
 parser.add_argument('--submitting_lab', '-sublab', help='Submitting lab (e.g. Biohub)')
 parser.add_argument('--date_submitted', '-subdate', help='Date of submission')
-args = parser.parseargs()
+args = parser.parse_args()
 
+# Build the new metadata.tsv
 old_metadata = pd.read_csv(args.prev_metadata, sep='\t')
 new_metadata = pd.DataFrame()
 
@@ -40,7 +42,7 @@ new_metadata['location'] = [args.location]*num_strains
 new_metadata['country_exposure'] = [args.country_exposure]*num_strains
 new_metadata['division_exposure'] = [args.div_exposure]*num_strains
 new_metadata['segment'] = ['genome']*num_strains
-new_metadata['length'] = [len(s) for sequences]
+new_metadata['length'] = [len(s) for s in sequences]
 new_metadata['host'] =  ['Human']*num_strains
 new_metadata['age'] = unknown_col
 new_metadata['sex'] = unknown_col
@@ -49,7 +51,11 @@ new_metadata['submitting_lab'] = [args.submitting_lab]*num_strains
 new_metadata['authors'] = unknown_col
 new_metadata['url'] = unknown_col
 new_metadata['title'] = unknown_col
-new_metadata['date_submitted'] = unknown_col
+new_metadata['date_submitted'] = [args.date_submitted]*num_strains
 
 df = pd.concat([old_metadata, new_metadata])
 df.to_csv('metadata.tsv', sep='\t', index=False)
+
+# Build the new sequences.fasta
+old_sequences = list(SeqIO.parse(args.prev_sequences, 'fasta'))
+SeqIO.write(old_sequences + sequences, 'sequences.fasta', 'fasta')

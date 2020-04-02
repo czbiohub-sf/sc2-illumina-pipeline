@@ -13,17 +13,17 @@ def helpMessage() {
       --reads                       Path to reads, must be in quotes
       --primers                     Path to BED file of primers
       --ref                         Path to FASTA reference sequence
-      --gisaid_metadata             Path to GISAID metadata from nextstrain
-      --gisaid_sequences            Path to GISAID sequences
-      --sample_date                 Date to input for sample collection
+      --gisaid_metadata             Path to GISAID metadata from Nextstrain
+      --gisaid_sequences            Path to GISAID sequences 
+      --collection_date             Collection date (e.g. '2020-03-08')
 
 
     Options:
       --single_end [bool]           Specifies that the input is single-end reads
       --skip_trim_adapters [bool]   Skip trimming of illumina adapters. (NOTE: this does NOT skip the step for trimming spiked primers)
-      --genes                       GFF (2 or 3)/BED for QUAST
       --maxNs                       Max number of Ns to allow assemblies to pass QC
       --minLength                   Minimum base pair length to allow assemblies to pass QC
+      --no_reads_quast              Run QUAST without aligning reads
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -46,10 +46,18 @@ if (params.help) {
 ch_multiqc_config = file(params.multiqc_config, checkIfExists: true)
 
 if (params.readPaths) {
-    Channel
-        .from(params.readPaths)
-        .map { row -> [ row[0], row[1].each{file(it)} ] }
+    if (params.single_end){
+        Channel
+        .fromList(params.readPaths)
+        .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true)] ] }
         .into {reads_ch; quast_reads}
+    } else {
+        Channel
+        .fromList(params.readPaths)
+        .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true), file(row[1][1], checkIfExists: true) ] ] }
+        .into {reads_ch; quast_reads}
+    }
+    
 } else {
     Channel
         .fromFilePairs(params.reads, size: params.single_end ? 1 : 2)
@@ -63,11 +71,10 @@ ch_bed = file(params.primers, checkIfExists: true)
 
 // Set up files for QUAST
 quast_ref = file(params.ref, checkIfExists: true)
-quast_genes = params.genes ? file(params.genes, checkIfExists: true) : Channel.empty() 
 
-// Set up GISAID files
-gisaid_metadata = file(params.gisaid_metadata, checkIfExists: true)
+// GISAID files
 gisaid_sequences = file(params.gisaid_sequences, checkIfExists: true)
+gisaid_metadata = file(params.gisaid_metadata, checkIfExists: true)
 
 process trimReads {
     tag { sampleName }
@@ -156,7 +163,6 @@ process quast {
 	input:
 	tuple(sampleName, path(assembly)) from quast_ch
 	path(quast_ref)
-    path(quast_genes)
 	tuple(sample, path(reads)) from quast_reads
 
 	output:
@@ -166,22 +172,18 @@ process quast {
     tuple(sampleName, path(assembly), path("${sampleName}/report.tsv")) into sort_assemblies_ch
 
     script:
-    if (params.genes)
+    if (params.no_reads_quast)
     """
-    quast --min-contig 0 -o ${sampleName} -r ${quast_ref} -g ${quast_genes} -t ${task.cpus} \
-    -1 ${reads[0]} -2 ${reads[1]} $assembly
+    quast --min-contig 0 -o ${sampleName} -r ${quast_ref} -t ${task.cpus} $assembly
     """
-
     else
     """
-    quast --min-contig 0 -o ${sampleName} -r ${quast_ref} -t ${task.cpus} \
-    -1 ${reads[0]} -2 ${reads[1]} $assembly
+    quast --min-contig 0 -o ${sampleName} -r ${quast_ref} -t ${task.cpus} -1 ${reads[0]} -2 ${reads[1]} $assembly
     """
 }
 
 process sortAssemblies {
     tag {sampleName}
-    publishDir "${params.outdir}/", mode: 'copy'
 
     input:
     tuple(sampleName, path(assembly), path(report_tsv)) from sort_assemblies_ch
@@ -226,6 +228,7 @@ process combineFiles {
 
 process makeNextstrainInput {
     publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
+    stageInMode 'copy'
 
     input:
     path(sample_sequences) from nextstrain_ch
@@ -233,28 +236,50 @@ process makeNextstrainInput {
     path(gisaid_metadata)
 
     output:
-    path('metadata.tsv')
-    path('sequences.fasta')
+    path('metadata.tsv') into nextstrain_metadata
+    path('norm_sequences.fasta') into nextstrain_sequences
 
     script:
-    date = new java.util.Date()
+    currdate = new java.util.Date().format('yyyy-MM-dd')
+    // Need to normalize the GISAID fasta here to avoid awk error in runNextstrain
     """
-    make_nextstrain_input.py -pm ${gisaid_metadata} -ns ${sample_sequences} -d ${params.date} \
-    -r North America -c USA -div California -loc San Francisco County -origlab Biohub -sublab Biohub \
-    -subdate $date
+    make_nextstrain_input.py -ps ${gisaid_sequences} -pm ${gisaid_metadata} -ns ${sample_sequences} --date ${params.collection_date} \
+    -r 'North America' -c USA -div 'California' -loc 'San Francisco County' -origlab 'Biohub' -sublab 'Biohub' \
+    -subdate $currdate
 
-    cat ${gisaid_sequences} > sequences.fasta
-    sed '1d' ${sample_sequences} >> sequences.fasta
+    normalize_gisaid_fasta.sh sequences.fasta norm_sequences.fasta
     """
 
 }
+
+// process fetchNextstrain {
+//     publishDir "${params.outdir}/nextstrain"
+//     echo true
+
+//     input:
+//     path(metadata) from nextstrain_metadata
+//     path(sequences) from nextstrain_sequences
+
+//     output:
+
+
+//     script:
+//     """
+//     wget https://github.com/nextstrain/ncov/archive/master.zip
+//     unzip master.zip
+//     cp ${sequences} ncov-master/data/sequences.fasta
+//     cp ${metadata} ncov-master/data/
+//     cd ncov-master
+//     snakemake -p
+//     """
+// }
 
 process multiqc {
 	publishDir "${params.outdir}/MultiQC", mode: 'copy'
 
     input:
     path(multiqc_config) from ch_multiqc_config
-    path(trim_galore_results) from trimmed_reports.collect()
+    path(trim_galore_results) from trimmed_reports.collect().ifEmpty([])
     path("quast_results/*/*") from multiqc_quast.collect()
 
     output:
