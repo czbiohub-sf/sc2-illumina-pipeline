@@ -519,7 +519,7 @@ process tipFrequencies {
     path(metadata) from tipfreq_metadata
 
     output:
-    path('ncov_tip-frequencies.json'), mode: 'copy'
+    path('ncov_tip-frequencies.json')
 
     script:
     """
@@ -531,7 +531,7 @@ process tipFrequencies {
         --pivot-interval 1 \
         --narrow-bandwidth 0.05 \
         --proportion-wide 0.0 \
-        --output ncov_tip-frequences.json
+        --output ncov_tip-frequencies.json
     """
 }
 
