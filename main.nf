@@ -26,6 +26,7 @@ def helpMessage() {
       --include_strains             File with included strains after augur filter (default: fetches from github.com/nextstrain/ncov)
       --exclude_strains             File with excluded strains for augur filter (default: fetches from github.com/nextstrain/ncov)
       --weights                     File with weights for augur traits (default: fetches from github.com/nextstrain/ncov)
+      --clades                      File with clade for augur clades (default: fetches from github.com/nextstrain/ncov)
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -422,7 +423,7 @@ process ancestralSequences {
     path(alignment) from ancestralsequences_alignment
 
     output:
-    path('nt_muts.json') into translatesequences_nodes
+    path('nt_muts.json') into (translatesequences_nodes, addclades_nuc_muts)
 
     script:
     """
@@ -445,7 +446,7 @@ process translateSequences {
     path(ref_gb)
 
     output:
-    path('aa_muts.json')
+    path('aa_muts.json') into addclades_aa_muts
 
     script:
     """
@@ -482,6 +483,30 @@ process inferTraits {
         --columns country_exposure \
         --confidence \
         --sampling-bias-correction 2.5 \
+    """
+}
+
+clades = file(params.clades, checkIfExists: true)
+
+process addClades {
+    label 'nextstrain'
+    publishDir "${params.outdir}/results", mode: 'copy'
+
+    input:
+    path(tree) from addclades_tree
+    path(aa_muts) from addclades_aa_muts
+    path(nuc_muts) from addclades_nuc_muts
+    path(clades)
+
+    output:
+    path('clades.json')
+
+    script:
+    """
+    augur clades --tree ${tree} \
+        --mutations ${nuc_muts} ${aa_muts} \
+        --clades ${clades} \
+        --output-node-data clades.json
     """
 }
 
