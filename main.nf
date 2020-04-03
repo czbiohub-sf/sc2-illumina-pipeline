@@ -285,7 +285,7 @@ process makeNextstrainInput {
     path(gisaid_metadata)
 
     output:
-    path('metadata.tsv') into (nextstrain_metadata, refinetree_metadata, infertraits_metadata)
+    path('metadata.tsv') into (nextstrain_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata)
     path('sequences.fasta') into nextstrain_sequences
 
     script:
@@ -390,7 +390,7 @@ process refineTree {
     path(metadata) from refinetree_metadata
 
     output:
-    path('tree.nwk') into (ancestralsequences_tree, translatesequences_tree, infertraits_tree, addclades_tree)
+    path('tree.nwk') into (ancestralsequences_tree, translatesequences_tree, infertraits_tree, addclades_tree, tipfreq_tree)
     path('branch_lengths.json')
 
     script:
@@ -507,6 +507,31 @@ process addClades {
         --mutations ${nuc_muts} ${aa_muts} \
         --clades ${clades} \
         --output-node-data clades.json
+    """
+}
+
+process tipFrequencies {
+    label 'nextstrain'
+    publishDir "${params.outdir}/auspice", mode: 'copy'
+
+    input:
+    path(tree) from tipfreq_tree
+    path(metadata) from tipfreq_metadata
+
+    output:
+    path('ncov_tip-frequencies.json'), mode: 'copy'
+
+    script:
+    """
+    augur frequencies \
+        --method kde \
+        --metadata ${metadata} \
+        --tree ${tree} \
+        --min-date 2020.0 \
+        --pivot-interval 1 \
+        --narrow-bandwidth 0.05 \
+        --proportion-wide 0.0 \
+        --output ncov_tip-frequences.json
     """
 }
 
