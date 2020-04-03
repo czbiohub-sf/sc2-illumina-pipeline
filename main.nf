@@ -398,7 +398,7 @@ process refineTree {
         --metadata ${metadata} \
         --output-tree tree.nwk \
         --output-node-data branch_lengths.json \
-        --root 'Wuhan-Hu-1/2019 Wuhan/WH01/2019' \
+        --root 'Wuhan-Hu-1/2019' \
         --timetree \
         --clock-rate 0.0008 \
         --clock-std-dev 0.0004 \
