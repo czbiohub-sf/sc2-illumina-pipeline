@@ -342,7 +342,7 @@ process alignSequences {
     path(ref_fasta)
 
     output:
-    path('aligned.fasta') into (aligned_ch, refinetree_alignment)
+    path('aligned.fasta') into (aligned_ch, refinetree_alignment, ancestralsequences_alignment)
 
     script:
     """
@@ -387,7 +387,7 @@ process refineTree {
     path(metadata) from refinetree_metadata
 
     output:
-    path('tree.nwk')
+    path('tree.nwk') into ancestralsequences_tree
     path('branch_lengths.json')
 
     script:
@@ -408,6 +408,28 @@ process refineTree {
         --date-confidence \
         --no-covariance \
         --clock-filter-iqd 4
+    """
+}
+
+process ancestralSequences {
+    label 'nextstrain'
+    publishDir "${params.outdir}/results", mode: 'copy'
+
+    input:
+    path(tree) from ancestralsequences_tree
+    path(alignment) from ancestralsequences_alignment
+
+    output:
+    path('nt_muts.json')
+
+    script:
+    """
+    augur ancestral \
+        --tree ${tree} \
+        --alignment ${alignment} \
+        --output-node-data nt_muts.json \
+        --inference joint \
+        --infer-ambiguous
     """
 }
 
