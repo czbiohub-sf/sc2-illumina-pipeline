@@ -12,13 +12,15 @@ import seaborn as sns
 
 parser = argparse.ArgumentParser()
 parser.add_argument("sample_name")
-parser.add_argument("in_bam")
+parser.add_argument("raw_bam")
+parser.add_argument("trimmed_filtered_bam")
 parser.add_argument("in_assembly")
 parser.add_argument("in_sam_stats")
 parser.add_argument("out_prefix")
 args = parser.parse_args()
 
-samfile = pysam.AlignmentFile(args.in_bam, "rb")
+raw_samfile = pysam.AlignmentFile(args.raw_bam, "rb")
+samfile = pysam.AlignmentFile(args.trimmed_filtered_bam, "rb")
 
 ref_len, = samfile.lengths
 depths = [0] * ref_len
@@ -38,7 +40,8 @@ allele_counts = dict(collections.Counter(str(seq.seq)))
 stats = {
     "sample_name": args.sample_name,
     "avg_depth": depths.mean(),
-    "allele_counts": allele_counts
+    "allele_counts": allele_counts,
+    "total_reads": raw_samfile.mapped + raw_samfile.unmapped,
 }
 
 with open(args.in_sam_stats) as f:

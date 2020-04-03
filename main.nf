@@ -116,15 +116,17 @@ process alignReads {
     """
 }
 
+aligned_reads.into { bam2trimPrimers; rawBam2stats }
+
 process trimPrimers {
 	tag { sampleName }
 	publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
 
     input:
-    tuple(sampleName, file(alignment)) from aligned_reads
+    tuple(sampleName, file(alignment)) from bam2trimPrimers
 
     output:
-    tuple(sampleName, file("${sampleName}.primertrimmed.bam")) into trimmed_bam_ch
+    tuple(sampleName, file("${sampleName}.primertrimmed.bam")) into trimmed_bam_ch;
     file("${sampleName}.primertrimmed.bam") into combined_vcf_bam
 
     script:
@@ -164,7 +166,7 @@ process computeStats {
     tag { sampleName }
 
     input:
-    tuple(sampleName, file(in_bam), file(in_fa)) from stats_bam.join(stats_fa)
+    tuple(sampleName, file(raw_bam), file(trimmed_filtered_bam), file(in_fa)) from rawBam2stats.join(stats_bam).join(stats_fa)
 
     output:
     file("${sampleName}.samtools_stats") into samtools_stats_out
@@ -173,10 +175,11 @@ process computeStats {
 
     script:
     """
-    samtools index ${in_bam}
-    samtools stats ${in_bam} > ${sampleName}.samtools_stats
+    samtools index ${trimmed_filtered_bam}
+    samtools index ${raw_bam}
+    samtools stats ${trimmed_filtered_bam} > ${sampleName}.samtools_stats
     alignment_assembly_stats.py \
-        ${sampleName} ${in_bam} ${in_fa} \
+        ${sampleName} ${raw_bam} ${trimmed_filtered_bam} ${in_fa} \
         ${sampleName}.samtools_stats ${sampleName}
     """
 }
