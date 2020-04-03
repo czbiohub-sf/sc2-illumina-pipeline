@@ -299,7 +299,12 @@ process quast {
 }
 
 // Set up GISAID files
-gisaid_sequences = file(params.gisaid_sequences, checkIfExists: true)
+if (params.gisaid_sequences != "") {
+    gisaid_sequences_ch = Channel.from(file(params.gisaid_sequences, checkIfExists: true))
+} else {
+    gisaid_sequences_ch = Channel.empty()
+}
+
 gisaid_metadata = file(params.gisaid_metadata, checkIfExists: true)
 
 process makeNextstrainInput {
@@ -308,7 +313,7 @@ process makeNextstrainInput {
 
     input:
     path(sample_sequences) from nextstrain_ch
-    path(gisaid_sequences)
+    path(gisaid_sequences) from gisaid_sequences_ch
     path(gisaid_metadata)
 
     output:
