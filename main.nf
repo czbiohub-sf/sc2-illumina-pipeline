@@ -275,32 +275,6 @@ process filterAssemblies {
     """
 }
 
-// TODO: move this into the computeStats process
-process quast {
-    tag { sampleName }
-    publishDir "${params.outdir}/QUAST", mode: 'copy'
-
-    input:
-    tuple(sampleName, path(assembly)) from quast_ch
-    tuple(sampleName, path(bam)) from quast_bam
-    tuple(sample, path(reads)) from quast_reads
-
-    output:
-    // Avoid name clash with other samples for MultiQC
-    path("${sampleName}/*")
-    path("${sampleName}/report.tsv") into multiqc_quast
-
-    script:
-    if (params.no_reads_quast)
-    """
-    quast --min-contig 0 -o ${sampleName} -r ${ref_fasta} -t ${task.cpus} --ref-bam ${bam} $assembly
-    """
-    else
-    """
-    quast --min-contig 0 -o ${sampleName} -r ${ref_fasta} -t ${task.cpus} -1 ${reads[0]} -2 ${reads[1]} --ref-bam ${bam} $assembly
-    """
-}
-
 // Set up GISAID files
 if (params.gisaid_sequences != "") {
     gisaid_sequences_ch = Channel.from(file(params.gisaid_sequences, checkIfExists: true))
@@ -604,22 +578,48 @@ process exportData {
     """
 }
 
-process multiqc {
-	publishDir "${params.outdir}/MultiQC", mode: 'copy'
-
-    input:
-    path(trim_galore_results) from trimmed_reports.collect().ifEmpty([])
-    path("quast_results/*/*") from multiqc_quast.collect()
-    path(samtools_stats) from samtools_stats_out.collect()
-    path(multiqc_config)
-
-    output:
-    path("*multiqc_report.html")
-    path("*_data")
-    path("multiqc_plots")
-
-	script:
-	"""
-	multiqc -f --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} quast_results/
-	"""
-}
+// TODO: quast breaks on empty assemblies
+//process quast {
+//    tag { sampleName }
+//    publishDir "${params.outdir}/QUAST", mode: 'copy'
+//
+//    input:
+//    tuple(sampleName, path(assembly)) from quast_ch
+//    tuple(sampleName, path(bam)) from quast_bam
+//    tuple(sample, path(reads)) from quast_reads
+//
+//    output:
+//    // Avoid name clash with other samples for MultiQC
+//    path("${sampleName}/*")
+//    path("${sampleName}/report.tsv") into multiqc_quast
+//
+//    script:
+//    if (params.no_reads_quast)
+//    """
+//    quast --min-contig 0 -o ${sampleName} -r ${ref_fasta} -t ${task.cpus} --ref-bam ${bam} $assembly
+//    """
+//    else
+//    """
+//    quast --min-contig 0 -o ${sampleName} -r ${ref_fasta} -t ${task.cpus} -1 ${reads[0]} -2 ${reads[1]} --ref-bam ${bam} $assembly
+//    """
+//}
+//
+//process multiqc {
+//	publishDir "${params.outdir}/MultiQC", mode: 'copy'
+//
+//    input:
+//    path(trim_galore_results) from trimmed_reports.collect().ifEmpty([])
+//    path("quast_results/*/*") from multiqc_quast.collect()
+//    path(samtools_stats) from samtools_stats_out.collect()
+//    path(multiqc_config)
+//
+//    output:
+//    path("*multiqc_report.html")
+//    path("*_data")
+//    path("multiqc_plots")
+//
+//	script:
+//	"""
+//	multiqc -f --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} quast_results/
+//	"""
+//}
