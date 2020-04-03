@@ -282,7 +282,7 @@ process makeNextstrainInput {
     path(gisaid_metadata)
 
     output:
-    path('metadata.tsv') into nextstrain_metadata
+    path('metadata.tsv') into (nextstrain_metadata, refinetree_metadata)
     path('sequences.fasta') into nextstrain_sequences
 
     script:
@@ -342,7 +342,7 @@ process alignSequences {
     path(ref_fasta)
 
     output:
-    path('aligned.fasta') into aligned_ch
+    path('aligned.fasta') into (aligned_ch, refinetree_alignment)
 
     script:
     """
@@ -363,17 +363,51 @@ process buildTree {
     cpus 4
 
     input:
-    path(aligned) from aligned_ch
+    path(alignment) from aligned_ch
 
     output:
-    path("tree_raw.nwk")
+    path("tree_raw.nwk") into tree_raw_ch
 
     script:
     """
     augur tree \
-        --alignment ${aligned} \
+        --alignment ${alignment} \
         --output tree_raw.nwk \
         --nthreads ${task.cpus}
+    """
+}
+
+process refineTree {
+    label 'nextstrain'
+    publishDir "${params.outdir}/results", mode: 'copy'
+
+    input:
+    path(tree) from tree_raw_ch
+    path(alignment) from refinetree_alignment
+    path(metadata) from refinetree_metadata
+
+    output:
+    path('tree.nwk')
+    path('branch_lengths.json')
+
+    script:
+    """
+    augur refine \
+        --tree ${tree} \
+        --alignment ${alignment} \
+        --metadata ${metadata} \
+        --output-tree tree.nwk \
+        --output-node-data branch_lengths.json \
+        --root 'Wuhan-Hu-1/2019 Wuhan/WH01/2019' \
+        --timetree \
+        --clock-rate 0.0008 \
+        --clock-std-dev 0.0004 \
+        --coalescent skyline \
+        --date-inference marginal \
+        --divergence-unit mutations \
+        --date-confidence \
+        --no-covariance \
+        --clock-filter-iqd 4
     """
 }
 
