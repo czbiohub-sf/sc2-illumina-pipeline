@@ -342,7 +342,7 @@ process alignSequences {
     path(ref_fasta)
 
     output:
-    path("aligned.fasta") aligned_ch
+    path('aligned.fasta') into aligned_ch
 
     script:
     """
@@ -366,7 +366,7 @@ process buildTree {
     path(aligned) from aligned_ch
 
     output:
-    path("results/tree_raw.nwk")
+    path("tree_raw.nwk")
 
     script:
     """
