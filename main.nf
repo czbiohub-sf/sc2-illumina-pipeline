@@ -25,6 +25,7 @@ def helpMessage() {
       --gisaid_metadata             Metadata for GISAID sequences (default: fetches from github.com/nextstrain/ncov)
       --include_strains             File with included strains after augur filter (default: fetches from github.com/nextstrain/ncov)
       --exclude_strains             File with excluded strains for augur filter (default: fetches from github.com/nextstrain/ncov)
+      --weights                     File with weights for augur traits (default: fetches from github.com/nextstrain/ncov)
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -283,7 +284,7 @@ process makeNextstrainInput {
     path(gisaid_metadata)
 
     output:
-    path('metadata.tsv') into (nextstrain_metadata, refinetree_metadata)
+    path('metadata.tsv') into (nextstrain_metadata, refinetree_metadata, infertraits_metadata)
     path('sequences.fasta') into nextstrain_sequences
 
     script:
@@ -388,7 +389,7 @@ process refineTree {
     path(metadata) from refinetree_metadata
 
     output:
-    path('tree.nwk') into (ancestralsequences_tree, translatesequences_tree)
+    path('tree.nwk') into (ancestralsequences_tree, translatesequences_tree, infertraits_tree)
     path('branch_lengths.json')
 
     script:
@@ -455,6 +456,33 @@ process translateSequences {
         --output-node-data aa_muts.json \
     """
 
+}
+
+weights = file(params.weights, checkIfExists: true)
+
+process inferTraits {
+    label 'nextstrain'
+    publishDir "${params.outdir}/results", mode: 'copy'
+
+    input:
+    path(tree) from infertraits_tree
+    path(metadata) from infertraits_metadata
+    path(weights)
+
+    output:
+    path('traits.json')
+
+    script:
+    """
+    augur traits \
+        --tree ${tree} \
+        --metadata ${metadata} \
+        --weights ${weights} \
+        --output traits.json \
+        --columns country_exposure \
+        --confidence \
+        --sampling-bias-correction 2.5 \
+    """
 }
 
 process multiqc {
