@@ -136,23 +136,7 @@ process trimPrimers {
     """
 }
 
-trimmed_bam_ch.into { quast_bam; consensus_bam; samtools_stats_bam;
-                     sample_vcf_bam }
-
-process samtoolsStats {
-    tag { sampleName }
-    input:
-    tuple(sampleName, file(in_bam)) from samtools_stats_bam
-
-    output:
-    file("${sampleName}.samtools_stats") into samtools_stats_out
-
-
-    script:
-    """
-    samtools stats ${in_bam} > ${sampleName}.samtools_stats
-    """
-}
+trimmed_bam_ch.into { quast_bam; consensus_bam; stats_bam; sample_vcf_bam }
 
 process makeConsensus {
 	tag { sampleName }
@@ -162,23 +146,41 @@ process makeConsensus {
 	tuple(sampleName, path(bam)) from consensus_bam
 
 	output:
-	tuple(sampleName, path("${sampleName}.fa")) into quast_ch
-        path("${sampleName}.fa") into merge_fastas_ch
-        path("${sampleName}.stats.json") into stats_ch
-        path("${sampleName}.depths.png")
+	tuple(sampleName, path("${sampleName}.consensus.fa")) into quast_ch
+	tuple(sampleName, path("${sampleName}.consensus.fa")) into stats_fa
+        path("${sampleName}.consensus.fa") into merge_fastas_ch
 
 	script:
 	"""
         samtools index ${bam}
 	samtools mpileup -A -d ${params.mpileupDepth} -Q0 ${bam} |
 	  ivar consensus -q ${params.ivarQualThreshold} -t ${params.ivarFreqThreshold} -m ${params.minDepth} -n N -p ${sampleName}.primertrimmed.consensus
-        clean_summarize_assembly.py \
-             ${sampleName} \
-             ${sampleName}.primertrimmed.bam \
-             ${sampleName}.primertrimmed.consensus.fa \
-             ${sampleName}
+        echo '>${sampleName}' > ${sampleName}.consensus.fa
+        seqtk seq -l 50 ${sampleName}.primertrimmed.consensus.fa | tail -n +2 >> ${sampleName}.consensus.fa
 	"""
 }
+
+process computeStats {
+    tag { sampleName }
+
+    input:
+    tuple(sampleName, file(in_bam), file(in_fa)) from stats_bam.join(stats_fa)
+
+    output:
+    file("${sampleName}.samtools_stats") into samtools_stats_out
+    path("${sampleName}.stats.json") into stats_ch
+    path("${sampleName}.depths.png")
+
+    script:
+    """
+    samtools index ${in_bam}
+    samtools stats ${in_bam} > ${sampleName}.samtools_stats
+    alignment_assembly_stats.py \
+        ${sampleName} ${in_bam} ${in_fa} \
+        ${sampleName}.samtools_stats ${sampleName}
+    """
+}
+
 
 process sampleVariants {
     tag { sampleName }
@@ -273,6 +275,7 @@ process filterAssemblies {
     """
 }
 
+// TODO: move this into the computeStats process
 process quast {
     tag { sampleName }
     publishDir "${params.outdir}/QUAST", mode: 'copy'

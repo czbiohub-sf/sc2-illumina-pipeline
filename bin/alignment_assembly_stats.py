@@ -3,6 +3,7 @@
 import argparse
 import collections
 import json
+import re
 import pysam
 from Bio import SeqIO
 import numpy as np
@@ -13,6 +14,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("sample_name")
 parser.add_argument("in_bam")
 parser.add_argument("in_assembly")
+parser.add_argument("in_sam_stats")
 parser.add_argument("out_prefix")
 args = parser.parse_args()
 
@@ -29,11 +31,6 @@ plt.yscale("symlog")
 plt.savefig(args.out_prefix + ".depths.png")
 
 seq, = SeqIO.parse(args.in_assembly, "fasta")
-seq.id = args.sample_name
-seq.name = args.sample_name
-seq.description = args.sample_name
-
-SeqIO.write([seq], args.out_prefix + ".fa", "fasta")
 
 allele_counts = dict(collections.Counter(str(seq.seq)))
 
@@ -43,6 +40,16 @@ stats = {
     "avg_depth": depths.mean(),
     "allele_counts": allele_counts
 }
+
+with open(args.in_sam_stats) as f:
+    sam_stats_re = re.compile(r"SN\s+([^\s].*):\s+(\d+)")
+    for line in f:
+        matched = sam_stats_re.match(line)
+        if matched:
+            if matched.group(1) == "reads mapped":
+                stats["mapped"] = int(matched.group(2))
+            elif matched.group(1) == "reads mapped and paired":
+                stats["mapped_paired"] = int(matched.group(2))
 
 with open(args.out_prefix + ".stats.json", "w") as f:
     json.dump(stats, f, indent=2)
