@@ -27,6 +27,8 @@ def helpMessage() {
       --exclude_strains             File with excluded strains for augur filter (default: fetches from github.com/nextstrain/ncov)
       --weights                     File with weights for augur traits (default: fetches from github.com/nextstrain/ncov)
       --clades                      File with clade for augur clades (default: fetches from github.com/nextstrain/ncov)
+      --auspice_config              Config file for auspice (default: fetches from github.com/nextstrain/ncov)
+      --lat_longs                   File with latitudes and longitudes for locations (default: fetches from github.com/nextstrain/ncov)
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -285,7 +287,7 @@ process makeNextstrainInput {
     path(gisaid_metadata)
 
     output:
-    path('metadata.tsv') into (nextstrain_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata)
+    path('metadata.tsv') into (nextstrain_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata, export_metadata)
     path('sequences.fasta') into nextstrain_sequences
 
     script:
@@ -390,8 +392,8 @@ process refineTree {
     path(metadata) from refinetree_metadata
 
     output:
-    path('tree.nwk') into (ancestralsequences_tree, translatesequences_tree, infertraits_tree, addclades_tree, tipfreq_tree)
-    path('branch_lengths.json')
+    path('tree.nwk') into (ancestralsequences_tree, translatesequences_tree, infertraits_tree, addclades_tree, tipfreq_tree, export_tree)
+    path('branch_lengths.json') into export_branch_lengths
 
     script:
     """
@@ -423,7 +425,7 @@ process ancestralSequences {
     path(alignment) from ancestralsequences_alignment
 
     output:
-    path('nt_muts.json') into (translatesequences_nodes, addclades_nuc_muts)
+    path('nt_muts.json') into (translatesequences_nodes, addclades_nuc_muts, export_nt_muts)
 
     script:
     """
@@ -446,7 +448,7 @@ process translateSequences {
     path(ref_gb)
 
     output:
-    path('aa_muts.json') into addclades_aa_muts
+    path('aa_muts.json') into (addclades_aa_muts, export_aa_muts)
 
     script:
     """
@@ -471,7 +473,7 @@ process inferTraits {
     path(weights)
 
     output:
-    path('traits.json')
+    path('traits.json') into export_traits
 
     script:
     """
@@ -499,7 +501,7 @@ process addClades {
     path(clades)
 
     output:
-    path('clades.json')
+    path('clades.json') into export_clades
 
     script:
     """
@@ -532,6 +534,39 @@ process tipFrequencies {
         --narrow-bandwidth 0.05 \
         --proportion-wide 0.0 \
         --output ncov_tip-frequencies.json
+    """
+}
+
+auspice_config = file(params.auspice_config, checkIfExists: true)
+lat_longs = file(params.lat_longs, checkIfExists: true)
+
+process exportData {
+    label 'nextstrain'
+    publishDir "${params.outdir}/auspice", mode: 'copy'
+
+    input:
+    path(tree) from export_tree
+    path(metadata) from export_metadata
+    path(branch_lengths) from export_branch_lengths
+    path(nt_muts) from export_nt_muts
+    path(aa_muts) from export_aa_muts
+    path(traits) from export_traits
+    path(auspice_config)
+    path(lat_longs)
+    path(clades) from export_clades
+
+    output:
+    path('ncov.json')
+
+    script:
+    """
+    augur export v2 \
+        --tree ${tree} \
+        --metadata ${metadata} \
+        --node-data ${branch_lengths} ${nt_muts} ${aa_muts} ${traits} ${clades} \
+        --auspice-config ${auspice_config} \
+        --lat-longs ${lat_longs} \
+        --output ncov.json
     """
 }
 
