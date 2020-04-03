@@ -115,7 +115,7 @@ process trimPrimers {
 
     output:
     tuple(sampleName, file("${sampleName}.primertrimmed.bam")) into trimmed_bam_ch
-    file("${sampleName}.primertrimmed.bam") into vcf_in_ch
+    file("${sampleName}.primertrimmed.bam") into combined_vcf_bam
 
     script:
     """
@@ -126,12 +126,13 @@ process trimPrimers {
     """
 }
 
-trimmed_bam_ch.into { quast_bam; consensus_bam; samtools_stats_in }
+trimmed_bam_ch.into { quast_bam; consensus_bam; samtools_stats_bam;
+                     sample_vcf_bam }
 
 process samtoolsStats {
     tag { sampleName }
     input:
-    tuple(sampleName, file(in_bam)) from samtools_stats_in
+    tuple(sampleName, file(in_bam)) from samtools_stats_bam
 
     output:
     file("${sampleName}.samtools_stats") into samtools_stats_out
@@ -160,7 +161,7 @@ process makeConsensus {
 	"""
         samtools index ${bam}
 	samtools mpileup -A -d ${params.mpileupDepth} -Q0 ${bam} |
-	  ivar consensus -q ${params.ivarQualThreshold} -t ${params.ivarFreqThreshold} -m ${params.ivarMinDepth} -n N -p ${sampleName}.primertrimmed.consensus
+	  ivar consensus -q ${params.ivarQualThreshold} -t ${params.ivarFreqThreshold} -m ${params.minDepth} -n N -p ${sampleName}.primertrimmed.consensus
         clean_summarize_assembly.py \
              ${sampleName} \
              ${sampleName}.primertrimmed.bam \
@@ -169,11 +170,31 @@ process makeConsensus {
 	"""
 }
 
-process callVariants {
+process sampleVariants {
+    tag { sampleName }
+    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
+
+    input:
+    tuple(sampleName, path(in_bam)) from sample_vcf_bam
+
+    output:
+    path("${sampleName}.vcf") into sample_vcf_out
+
+    script:
+    """
+    bcftools mpileup -f ${ref_fasta} \
+               ${in_bam} |
+          bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - |
+          bcftools view -e 'DP<${params.minDepth}' > ${sampleName}.vcf
+    """
+}
+
+process combinedVariants {
     publishDir "${params.outdir}", mode: 'copy'
 
     input:
-    path(in_bam) from vcf_in_ch.collect()
+    path(in_bam) from combined_vcf_bam.collect()
+    path(vcfs) from sample_vcf_out.collect()
 
     output:
     path("combined.vcf") into ch_vcf
@@ -181,7 +202,11 @@ process callVariants {
     // use theta=.0003, assuming about 10 mutations between 2 random samples
     script:
     """
-    bcftools mpileup -f ${ref_fasta} \
+    printf "%s\\n" ${vcfs} | xargs -I % bgzip %
+    printf "%s\\n" ${vcfs} | xargs -I % tabix %.gz
+    printf "%s\\n" ${in_bam} | xargs -I % samtools index %
+    bcftools merge \$(printf "%s.gz\n" ${vcfs}) | bcftools query -f '%CHROM\\t%POS\\t%END\\n' > variant_positions.txt
+    bcftools mpileup -f ${ref_fasta} -R variant_positions.txt \
                ${in_bam} |
           bcftools call --ploidy 1 -m -P 0.0003 -v - > combined.vcf
     """
