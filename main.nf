@@ -319,7 +319,7 @@ process makeNextstrainInput {
     currdate = new java.util.Date().format('yyyy-MM-dd')
     // Normalize the GISAID names using Nextstrain's bash script
     """
-    make_nextstrain_input.py -ps ${gisaid_sequences} -pm ${gisaid_metadata} -ns ${sample_sequences} --date ${params.collection_date} \
+    make_nextstrain_input.py -ps ${gisaid_sequences} -pm ${gisaid_metadata} -ns ${sample_sequences} --date $currdate \
     -r 'North America' -c USA -div 'California' -loc 'San Francisco County' -origlab 'Biohub' -sublab 'Biohub' \
     -subdate $currdate
 
@@ -401,6 +401,7 @@ process buildTree {
     script:
     """
     augur tree \
+        --method fasttree \
         --alignment ${alignment} \
         --output tree_raw.nwk \
         --nthreads ${task.cpus}
