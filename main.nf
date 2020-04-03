@@ -67,6 +67,7 @@ if (params.readPaths) {
 untrimmed_ch = params.skip_trim_adapters ? Channel.empty() : reads_ch
 
 ref_fasta = file(params.ref, checkIfExists: true)
+ref_gb = file(params.ref_gb, checkIfExists: true)
 primer_bed = file(params.primers, checkIfExists: true)
 
 
@@ -387,7 +388,7 @@ process refineTree {
     path(metadata) from refinetree_metadata
 
     output:
-    path('tree.nwk') into ancestralsequences_tree
+    path('tree.nwk') into (ancestralsequences_tree, translatesequences_tree)
     path('branch_lengths.json')
 
     script:
@@ -420,7 +421,7 @@ process ancestralSequences {
     path(alignment) from ancestralsequences_alignment
 
     output:
-    path('nt_muts.json')
+    path('nt_muts.json') into translatesequences_nodes
 
     script:
     """
@@ -431,6 +432,29 @@ process ancestralSequences {
         --inference joint \
         --infer-ambiguous
     """
+}
+
+process translateSequences {
+    label 'nextstrain'
+    publishDir "${params.outdir}/results", mode: 'copy'
+
+    input:
+    path(tree) from translatesequences_tree
+    path(nodes) from translatesequences_nodes
+    path(ref_gb)
+
+    output:
+    path('aa_muts.json')
+
+    script:
+    """
+    augur translate \
+        --tree ${tree} \
+        --ancestral-sequences ${nodes} \
+        --reference-sequence ${ref_gb} \
+        --output-node-data aa_muts.json \
+    """
+
 }
 
 process multiqc {
