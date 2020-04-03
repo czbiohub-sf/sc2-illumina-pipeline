@@ -58,4 +58,4 @@ df.to_csv('metadata.tsv', sep='\t', index=False)
 
 # Build the new sequences.fasta
 old_sequences = list(SeqIO.parse(args.prev_sequences, 'fasta'))
-SeqIO.write(old_sequences + sequences, 'sequences.fasta', 'fasta')
+SeqIO.write(old_sequences + sequences, 'all_sequences.fasta', 'fasta')

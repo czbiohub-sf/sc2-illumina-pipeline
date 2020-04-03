@@ -13,9 +13,7 @@ def helpMessage() {
       --reads                       Path to reads, must be in quotes
       --primers                     Path to BED file of primers
       --ref                         Path to FASTA reference sequence
-      --gisaid_metadata             Path to GISAID metadata from Nextstrain
-      --gisaid_sequences            Path to GISAID sequences 
-      --collection_date             Collection date (e.g. '2020-03-08')
+      --gisaid_sequences            GISAID FASTA
 
 
     Options:
@@ -24,6 +22,9 @@ def helpMessage() {
       --maxNs                       Max number of Ns to allow assemblies to pass QC
       --minLength                   Minimum base pair length to allow assemblies to pass QC
       --no_reads_quast              Run QUAST without aligning reads
+      --gisaid_metadata             Metadata for GISAID sequences (default: fetches from github.com/nextstrain/ncov)
+      --include_strains             File with included strains after augur filter (default: fetches from github.com/nextstrain/ncov)
+      --exclude_strains             File with excluded strains for augur filter (default: fetches from github.com/nextstrain/ncov)
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -68,12 +69,6 @@ untrimmed_ch = params.skip_trim_adapters ? Channel.empty() : reads_ch
 ref_fasta = file(params.ref, checkIfExists: true)
 primer_bed = file(params.primers, checkIfExists: true)
 
-// Set up files for QUAST
-quast_ref = file(params.ref, checkIfExists: true)
-
-// GISAID files
-gisaid_sequences = file(params.gisaid_sequences, checkIfExists: true)
-gisaid_metadata = file(params.gisaid_metadata, checkIfExists: true)
 
 process trimReads {
     tag { sampleName }
@@ -100,10 +95,6 @@ unaligned_ch = params.skip_trim_adapters ? reads_ch : trimmed_ch
 
 process alignReads {
     tag { sampleName }
-<<<<<<< HEAD
-    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
-=======
->>>>>>> origin/master
 
     cpus 4
 
@@ -239,7 +230,7 @@ process filterAssemblies {
 
     output:
     path("filtered.stats.tsv")
-    path("filtered.fa")
+    path("filtered.fa") into nextstrain_ch
     path("filtered.vcf")
 
     script:
@@ -277,6 +268,10 @@ process quast {
     """
 }
 
+// Set up GISAID files
+gisaid_sequences = file(params.gisaid_sequences, checkIfExists: true)
+gisaid_metadata = file(params.gisaid_metadata, checkIfExists: true)
+
 process makeNextstrainInput {
     publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
     stageInMode 'copy'
@@ -288,58 +283,97 @@ process makeNextstrainInput {
 
     output:
     path('metadata.tsv') into nextstrain_metadata
-    path('norm_sequences.fasta') into nextstrain_sequences
+    path('sequences.fasta') into nextstrain_sequences
 
     script:
     currdate = new java.util.Date().format('yyyy-MM-dd')
-    // Need to normalize the GISAID fasta here to avoid awk error in runNextstrain
+    // Normalize the GISAID names using Nextstrain's bash script
     """
     make_nextstrain_input.py -ps ${gisaid_sequences} -pm ${gisaid_metadata} -ns ${sample_sequences} --date ${params.collection_date} \
     -r 'North America' -c USA -div 'California' -loc 'San Francisco County' -origlab 'Biohub' -sublab 'Biohub' \
     -subdate $currdate
 
-    normalize_gisaid_fasta.sh sequences.fasta norm_sequences.fasta
+    normalize_gisaid_fasta.sh all_sequences.fasta sequences.fasta
     """
 
 }
 
-// process fetchNextstrain {
-//     publishDir "${params.outdir}/nextstrain"
-//     echo true
+include_file = file(params.include_strains, checkIfExists: true)
+exclude_file = file(params.exclude_strains, checkIfExists: true)
 
-//     input:
-//     path(metadata) from nextstrain_metadata
-//     path(sequences) from nextstrain_sequences
+process filterStrains {
+    label 'nextstrain'
+    publishDir "${params.outdir}/nextstrain/", mode: 'copy'
 
-//     output:
+    input:
+    path(sequences) from nextstrain_sequences
+    path(metadata) from nextstrain_metadata
+    path(include_file)
+    path(exclude_file)
 
+    output:
+    path('results/filtered.fasta') into filtered_sequences_ch
 
-//     script:
-//     """
-//     wget https://github.com/nextstrain/ncov/archive/master.zip
-//     unzip master.zip
-//     cp ${sequences} ncov-master/data/sequences.fasta
-//     cp ${metadata} ncov-master/data/
-//     cd ncov-master
-//     snakemake -p
-//     """
-// }
+    script:
+    String exclude_where = "date='2020' date='2020-01-XX' date='2020-02-XX' date='2020-03-XX' date='2020-04-XX' date='2020-01' date='2020-02' date='2020-03' date='2020-04'"
+    """
+    mkdir -p results
+    augur filter \
+            --sequences ${sequences} \
+            --metadata ${metadata} \
+            --include ${include_file} \
+            --exclude ${exclude_file} \
+            --exclude-where ${exclude_where} \
+            --min-length 25000 \
+            --group-by 'division year month' \
+            --sequences-per-group 300 \
+            --output results/filtered.fasta
+    """
+
+}
+
+process alignSequences {
+    label 'nextstrain'
+    publishDir "${params.outdir}/nextstrain", mode: 'copy'
+
+    cpus 4
+
+    input:
+    path(filtered_sequences) from filtered_sequences_ch
+    path(ref_fasta)
+
+    output:
+    path("results/aligned.fasta")
+
+    script:
+    """
+    mkdir -p results
+    augur align \
+        --sequences ${filtered_sequences} \
+        --reference-sequence ${ref_fasta} \
+        --output results/aligned.fasta \
+        --nthreads ${task.cpus} \
+        --remove-reference \
+        --fill-gaps
+    """
+}
 
 process multiqc {
-    publishDir "${params.outdir}/MultiQC", mode: 'copy'
+	publishDir "${params.outdir}/MultiQC", mode: 'copy'
 
     input:
     path(trim_galore_results) from trimmed_reports.collect().ifEmpty([])
     path("quast_results/*/*") from multiqc_quast.collect()
     path(samtools_stats) from samtools_stats_out.collect()
+    path(multiqc_config)
 
     output:
     path("*multiqc_report.html")
     path("*_data")
     path("multiqc_plots")
 
-    script:
-    """
-    multiqc -f --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} quast_results/
-    """
-
+	script:
+	"""
+	multiqc -f --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} quast_results/
+	"""
+}
