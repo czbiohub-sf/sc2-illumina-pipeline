@@ -390,7 +390,7 @@ process refineTree {
     path(metadata) from refinetree_metadata
 
     output:
-    path('tree.nwk') into (ancestralsequences_tree, translatesequences_tree, infertraits_tree)
+    path('tree.nwk') into (ancestralsequences_tree, translatesequences_tree, infertraits_tree, addclades_tree)
     path('branch_lengths.json')
 
     script:
