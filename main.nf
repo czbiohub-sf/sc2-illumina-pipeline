@@ -384,7 +384,7 @@ process buildTree {
 
 process refineTree {
     label 'nextstrain'
-    publishDir "${params.outdir}/results", mode: 'copy'
+    publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
     input:
     path(tree) from tree_raw_ch
@@ -418,7 +418,7 @@ process refineTree {
 
 process ancestralSequences {
     label 'nextstrain'
-    publishDir "${params.outdir}/results", mode: 'copy'
+    publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
     input:
     path(tree) from ancestralsequences_tree
@@ -440,7 +440,7 @@ process ancestralSequences {
 
 process translateSequences {
     label 'nextstrain'
-    publishDir "${params.outdir}/results", mode: 'copy'
+    publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
     input:
     path(tree) from translatesequences_tree
@@ -465,7 +465,7 @@ weights = file(params.weights, checkIfExists: true)
 
 process inferTraits {
     label 'nextstrain'
-    publishDir "${params.outdir}/results", mode: 'copy'
+    publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
     input:
     path(tree) from infertraits_tree
@@ -492,7 +492,7 @@ clades = file(params.clades, checkIfExists: true)
 
 process addClades {
     label 'nextstrain'
-    publishDir "${params.outdir}/results", mode: 'copy'
+    publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
     input:
     path(tree) from addclades_tree
@@ -514,7 +514,7 @@ process addClades {
 
 process tipFrequencies {
     label 'nextstrain'
-    publishDir "${params.outdir}/auspice", mode: 'copy'
+    publishDir "${params.outdir}/nextstrain/auspice", mode: 'copy'
 
     input:
     path(tree) from tipfreq_tree
@@ -542,7 +542,7 @@ lat_longs = file(params.lat_longs, checkIfExists: true)
 
 process exportData {
     label 'nextstrain'
-    publishDir "${params.outdir}/auspice", mode: 'copy'
+    publishDir "${params.outdir}/nextstrain/auspice", mode: 'copy'
 
     input:
     path(tree) from export_tree
