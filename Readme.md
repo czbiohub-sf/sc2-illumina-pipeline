@@ -6,3 +6,6 @@ https://www.protocols.io/private/32717E8D59E211EABDB40242AC110003?step=4
 
 Initial version of this pipeline was based on
 https://github.com/connor-lab/ncov2019-artic-nf
+
+Augur/Auspice pipeline based on
+https://github.com/nextstrain/ncov
