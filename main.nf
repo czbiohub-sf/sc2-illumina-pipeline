@@ -303,7 +303,7 @@ exclude_file = file(params.exclude_strains, checkIfExists: true)
 
 process filterStrains {
     label 'nextstrain'
-    publishDir "${params.outdir}/nextstrain/", mode: 'copy'
+    publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
     input:
     path(sequences) from nextstrain_sequences
@@ -312,12 +312,11 @@ process filterStrains {
     path(exclude_file)
 
     output:
-    path('results/filtered.fasta') into filtered_sequences_ch
+    path('filtered.fasta') into filtered_sequences_ch
 
     script:
     String exclude_where = "date='2020' date='2020-01-XX' date='2020-02-XX' date='2020-03-XX' date='2020-04-XX' date='2020-01' date='2020-02' date='2020-03' date='2020-04'"
     """
-    mkdir -p results
     augur filter \
             --sequences ${sequences} \
             --metadata ${metadata} \
@@ -327,14 +326,14 @@ process filterStrains {
             --min-length 25000 \
             --group-by 'division year month' \
             --sequences-per-group 300 \
-            --output results/filtered.fasta
+            --output filtered.fasta
     """
 
 }
 
 process alignSequences {
     label 'nextstrain'
-    publishDir "${params.outdir}/nextstrain", mode: 'copy'
+    publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
     cpus 4
 
@@ -343,18 +342,38 @@ process alignSequences {
     path(ref_fasta)
 
     output:
-    path("results/aligned.fasta")
+    path("aligned.fasta") aligned_ch
 
     script:
     """
-    mkdir -p results
     augur align \
         --sequences ${filtered_sequences} \
         --reference-sequence ${ref_fasta} \
-        --output results/aligned.fasta \
+        --output aligned.fasta \
         --nthreads ${task.cpus} \
         --remove-reference \
         --fill-gaps
+    """
+}
+
+process buildTree {
+    label 'nextstrain'
+    publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
+
+    cpus 4
+
+    input:
+    path(aligned) from aligned_ch
+
+    output:
+    path("results/tree_raw.nwk")
+
+    script:
+    """
+    augur tree \
+        --alignment ${aligned} \
+        --output tree_raw.nwk \
+        --nthreads ${task.cpus}
     """
 }
 
