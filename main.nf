@@ -127,6 +127,7 @@ process trimPrimers {
 
     output:
     tuple(sampleName, file("${sampleName}.primertrimmed.bam")) into trimmed_bam_ch;
+    file("${sampleName}.primertrimmed.bam.bai")
     file("${sampleName}.primertrimmed.bam") into combined_vcf_bam
 
     script:
@@ -135,10 +136,11 @@ process trimPrimers {
     samtools index ivar.bam
     ivar trim -e -i ivar.bam -b ${primer_bed} -p ivar.out
     samtools sort -O bam -o ${sampleName}.primertrimmed.bam ivar.out.bam
+    samtools index ${sampleName}.primertrimmed.bam
     """
 }
 
-trimmed_bam_ch.into { quast_bam; consensus_bam; stats_bam; sample_vcf_bam }
+trimmed_bam_ch.into { quast_bam; consensus_bam; stats_bam; }
 
 process makeConsensus {
 	tag { sampleName }
@@ -148,9 +150,7 @@ process makeConsensus {
 	tuple(sampleName, path(bam)) from consensus_bam
 
 	output:
-	tuple(sampleName, path("${sampleName}.consensus.fa")) into quast_ch
-	tuple(sampleName, path("${sampleName}.consensus.fa")) into stats_fa
-        path("${sampleName}.consensus.fa") into merge_fastas_ch
+	tuple(sampleName, path("${sampleName}.consensus.fa")) into consensus_fa
 
 	script:
 	"""
@@ -160,6 +160,50 @@ process makeConsensus {
         echo '>${sampleName}' > ${sampleName}.consensus.fa
         seqtk seq -l 50 ${sampleName}.primertrimmed.consensus.fa | tail -n +2 >> ${sampleName}.consensus.fa
 	"""
+}
+
+consensus_fa.into { quast_ch; stats_fa; merge_fastas_ch; realign_fa }
+merge_fastas_ch = merge_fastas_ch.map { it[1] }
+
+process realignConsensus {
+    tag { sampleName }
+    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
+
+    input:
+    tuple(sampleName, path(in_fa)) from realign_fa
+
+    output:
+    tuple(sampleName, path("${sampleName}.realigned.bam")) into realigned_bam
+    path("${sampleName}.realigned.bam.bai")
+
+    script:
+    """
+    minimap2 -ax asm5 -R '@RG\\tID:${sampleName}\\tSM:${sampleName}' \
+      ${ref_fasta} ${in_fa} |
+      samtools sort -O bam -o ${sampleName}.realigned.bam
+    samtools index ${sampleName}.realigned.bam
+    """
+}
+
+realigned_bam.into { call_variants_bam; combined_variants_bams }
+combined_variants_bams = combined_variants_bams.map { it[1] }.collect()
+
+process callVariants {
+    tag { sampleName }
+    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
+
+    input:
+    tuple(sampleName, path(in_bam)) from call_variants_bam
+
+    output:
+    path("${sampleName}.vcf") into sample_vcf_out
+
+    script:
+    """
+    bcftools mpileup -f ${ref_fasta} ${in_bam} |
+      bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
+      > ${sampleName}.vcf
+    """
 }
 
 process computeStats {
@@ -184,46 +228,20 @@ process computeStats {
     """
 }
 
-
-process sampleVariants {
-    tag { sampleName }
-    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
-
-    input:
-    tuple(sampleName, path(in_bam)) from sample_vcf_bam
-
-    output:
-    path("${sampleName}.vcf") into sample_vcf_out
-
-    script:
-    """
-    bcftools mpileup -f ${ref_fasta} \
-               ${in_bam} |
-          bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - |
-          bcftools view -e 'DP<${params.minDepth}' > ${sampleName}.vcf
-    """
-}
-
 process combinedVariants {
     publishDir "${params.outdir}", mode: 'copy'
 
     input:
-    path(in_bam) from combined_vcf_bam.collect()
-    path(vcfs) from sample_vcf_out.collect()
+    path(in_bams) from combined_variants_bams
 
     output:
     path("combined.vcf") into ch_vcf
 
-    // use theta=.0003, assuming about 10 mutations between 2 random samples
     script:
     """
-    printf "%s\\n" ${vcfs} | xargs -I % bgzip %
-    printf "%s\\n" ${vcfs} | xargs -I % tabix %.gz
-    printf "%s\\n" ${in_bam} | xargs -I % samtools index %
-    bcftools merge \$(printf "%s.gz\n" ${vcfs}) | bcftools query -f '%CHROM\\t%POS\\t%END\\n' > variant_positions.txt
-    bcftools mpileup -f ${ref_fasta} -R variant_positions.txt \
-               ${in_bam} |
-          bcftools call --ploidy 1 -m -P 0.0003 -v - > combined.vcf
+    bcftools mpileup -f ${ref_fasta} ${in_bams} |
+      bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
+      > combined.vcf
     """
 }
 
