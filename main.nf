@@ -196,7 +196,7 @@ process callVariants {
     tuple(sampleName, path(in_bam)) from call_variants_bam
 
     output:
-    path("${sampleName}.vcf") into sample_vcf_out
+    tuple(sampleName, path("${sampleName}.vcf")) into sample_variants_vcf
 
     script:
     """
@@ -206,11 +206,21 @@ process callVariants {
     """
 }
 
+rawBam2stats
+    .join(stats_bam)
+    .join(stats_fa)
+    .join(sample_variants_vcf)
+    .set { stats_ch_in }
+
 process computeStats {
     tag { sampleName }
 
     input:
-    tuple(sampleName, file(raw_bam), file(trimmed_filtered_bam), file(in_fa)) from rawBam2stats.join(stats_bam).join(stats_fa)
+    tuple(sampleName,
+          file(raw_bam),
+          file(trimmed_filtered_bam),
+          file(in_fa),
+          file(in_vcf)) from stats_ch_in
 
     output:
     file("${sampleName}.samtools_stats") into samtools_stats_out
@@ -223,8 +233,13 @@ process computeStats {
     samtools index ${raw_bam}
     samtools stats ${trimmed_filtered_bam} > ${sampleName}.samtools_stats
     alignment_assembly_stats.py \
-        ${sampleName} ${raw_bam} ${trimmed_filtered_bam} ${in_fa} \
-        ${sampleName}.samtools_stats ${sampleName}
+        --sample_name ${sampleName} \
+        --raw_bam ${raw_bam} \
+        --cleaned_bam ${trimmed_filtered_bam} \
+        --samtools_stats ${sampleName}.samtools_stats \
+        --assembly ${in_fa} \
+        --vcf ${in_vcf} \
+        --out_prefix ${sampleName}
     """
 }
 
@@ -235,7 +250,7 @@ process combinedVariants {
     path(in_bams) from combined_variants_bams
 
     output:
-    path("combined.vcf") into ch_vcf
+    path("combined.vcf") into combined_variants_vcf
 
     script:
     """
@@ -279,7 +294,7 @@ process filterAssemblies {
     input:
     path(merged_stats) from merged_stats_ch
     path(merged_assemblies) from merged_assemblies_ch
-    path(vcf) from ch_vcf
+    path(vcf) from combined_variants_vcf
 
     output:
     path("filtered.stats.tsv")

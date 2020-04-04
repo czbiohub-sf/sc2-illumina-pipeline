@@ -18,4 +18,4 @@ for fname in sys.argv[1:]:
     row["n_ambiguous"] = sum(v for k, v in allele_counts.items() if k not in "ACTGUN-")
     rows.append(row)
 
-pd.DataFrame(rows).to_csv(sys.stdout, index=False, sep="\t")
+pd.DataFrame(rows).to_csv(sys.stdout, index=False, sep="\t", float_format="%.1f")
