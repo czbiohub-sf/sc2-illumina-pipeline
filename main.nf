@@ -145,6 +145,8 @@ process kraken2 {
 
     gzip ${sampleName}_covid_1.fq
     gzip ${sampleName}_covid_2.fq
+
+    rm ${sampleName}_classified_*.fq
     """
 }
 
