@@ -17,6 +17,7 @@ def helpMessage() {
 
 
     Options:
+      --kraken2_db                  Path to kraken db (default: "")
       --single_end [bool]           Specifies that the input is single-end reads
       --skip_trim_adapters [bool]   Skip trimming of illumina adapters. (NOTE: this does NOT skip the step for trimming spiked primers)
       --maxNs                       Max number of Ns to allow assemblies to pass QC
@@ -50,30 +51,36 @@ if (params.help) {
 
 multiqc_config = file(params.multiqc_config, checkIfExists: true)
 
+ref_fasta = file(params.ref, checkIfExists: true)
+ref_gb = file(params.ref_gb, checkIfExists: true)
+primer_bed = file(params.primers, checkIfExists: true)
+
 if (params.readPaths) {
     if (params.single_end){
         Channel
         .fromList(params.readPaths)
         .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true)] ] }
-        .into {reads_ch; quast_reads}
+        .into { reads }
     } else {
         Channel
         .fromList(params.readPaths)
         .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true), file(row[1][1], checkIfExists: true) ] ] }
-        .into {reads_ch; quast_reads}
+        .into { reads }
     }
 } else {
     Channel
         .fromFilePairs(params.reads, size: params.single_end ? 1 : 2)
-        .into {reads_ch; quast_reads}
+        .into { reads_ch }
 }
 
-untrimmed_ch = params.skip_trim_adapters ? Channel.empty() : reads_ch
-
-ref_fasta = file(params.ref, checkIfExists: true)
-ref_gb = file(params.ref_gb, checkIfExists: true)
-primer_bed = file(params.primers, checkIfExists: true)
-
+if (params.skip_trim_adapters) {
+    // skip trimming
+    trimgalore_reads_in = Channel.empty()
+} else {
+    // send reads to trim_galore, and empty the reads channel
+    trimgalore_reads_in = reads_ch
+    reads_ch = Channel.empty()
+}
 
 process trimReads {
     tag { sampleName }
@@ -81,14 +88,11 @@ process trimReads {
     cpus 2
 
     input:
-    tuple(sampleName, file(reads)) from untrimmed_ch
+    tuple(sampleName, file(reads)) from trimgalore_reads_in
 
     output:
-    tuple(sampleName, file("*_val_*.fq.gz")) into trimmed_ch
+    tuple(sampleName, file("*_val_*.fq.gz")) into trimgalore_reads_out
     path("*") into trimmed_reports
-
-    when:
-    !params.skip_trim_adapters
 
     script:
     """
@@ -96,7 +100,59 @@ process trimReads {
     """
 }
 
-unaligned_ch = params.skip_trim_adapters ? reads_ch : trimmed_ch
+// send trim_galore output back to the reads channel
+reads_ch = reads_ch.concat(trimgalore_reads_out)
+
+if (params.kraken2_db == "") {
+    // skip kraken
+    kraken2_reads_in = Channel.empty()
+    kraken2_db = Channel.empty()
+} else {
+    // send reads to kraken, and empty the reads channel
+    kraken2_reads_in = reads_ch
+    reads_ch = Channel.empty()
+    kraken2_db = file(params.kraken2_db, checkIfExists: true)
+}
+
+process kraken2 {
+    tag { sampleName }
+    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
+
+    input:
+    path(db) from kraken2_db
+    tuple(sampleName, file(reads)) from kraken2_reads_in
+
+    output:
+    tuple(sampleName, "${sampleName}.kraken2_report")
+    tuple(sampleName, file("${sampleName}_covid_*.fq.gz")) into kraken2_reads_out
+
+    script:
+    """
+    kraken2 --db ${db} \
+      --report ${sampleName}.kraken2_report \
+      --classified-out "${sampleName}_classified#.fq" \
+      --output - \
+      --memory-mapping --gzip-compressed --paired \
+      ${reads}
+
+    grep --no-group-separator -A3 "kraken:taxid|2697049" \
+         ${sampleName}_classified_1.fq \
+         > ${sampleName}_covid_1.fq || [[ \$? == 1 ]]
+
+    grep --no-group-separator -A3 "kraken:taxid|2697049" \
+         ${sampleName}_classified_2.fq \
+         > ${sampleName}_covid_2.fq || [[ \$? == 1 ]]
+
+    gzip ${sampleName}_covid_1.fq
+    gzip ${sampleName}_covid_2.fq
+    """
+}
+
+//send kraken output back to the reads channel
+reads_ch = reads_ch.concat(kraken2_reads_out)
+
+// send reads to minimap2 and quast
+reads_ch.into { minimap2_reads_in; quast_reads }
 
 process alignReads {
     tag { sampleName }
@@ -104,7 +160,7 @@ process alignReads {
     cpus 4
 
     input:
-    tuple(sampleName, file(reads)) from unaligned_ch
+    tuple(sampleName, file(reads)) from minimap2_reads_in
 
     output:
     tuple(sampleName, file("${sampleName}.bam")) into aligned_reads
@@ -502,7 +558,6 @@ process translateSequences {
         --reference-sequence ${ref_gb} \
         --output-node-data aa_muts.json \
     """
-
 }
 
 weights = file(params.weights, checkIfExists: true)

@@ -12,6 +12,7 @@ dependencies:
   - trim-galore=0.6.5
   - multiqc=1.8
   - quast=5.0.2
+  - kraken2=2.0.8_beta
   - numpy=1.18.1
   - pandas=1.0.3
   - seaborn=0.10.0
