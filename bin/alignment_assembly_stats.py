@@ -48,6 +48,12 @@ with open(args.samtools_stats) as f:
                 stats["mapped"] = int(matched.group(2))
             elif matched.group(1) == "reads mapped and paired":
                 stats["mapped_paired"] = int(matched.group(2))
+            elif matched.group(1) == "inward oriented pairs":
+                stats["pairs_inward"] = int(matched.group(2)) * 2
+            elif matched.group(1) == "outward oriented pairs":
+                stats["pairs_outward"] = int(matched.group(2)) * 2
+            elif matched.group(1) == "pairs with other orientation":
+                stats["pairs_other_orientation"] = int(matched.group(2)) * 2
             # TODO: number of discordant read pairs
 
 vcf = pysam.VariantFile(args.vcf)
