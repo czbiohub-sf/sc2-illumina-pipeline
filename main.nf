@@ -73,6 +73,10 @@ if (params.readPaths) {
         .set { reads_ch }
 }
 
+// remove excluded samples from reads_ch
+exclude_samples = params.exclude_samples.split(",")
+reads_ch = reads_ch.filter { !exclude_samples.contains(it[0]) }
+
 reads_ch.into { unaligned_reads; stats_reads; }
 reads_ch = unaligned_reads
 
@@ -138,10 +142,6 @@ process kraken2 {
     fi
     """
 }
-
-// remove excluded samples from reads_ch
-exclude_samples = params.exclude_samples.split(",")
-reads_ch = reads_ch.filter { !exclude_samples.contains(it[0]) }
 
 //send kraken output back to the reads channel
 reads_ch = reads_ch.concat(kraken2_reads_out)
