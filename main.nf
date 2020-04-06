@@ -60,18 +60,21 @@ if (params.readPaths) {
         Channel
         .fromList(params.readPaths)
         .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true)] ] }
-        .set { reads }
+        .set { reads_ch }
     } else {
         Channel
         .fromList(params.readPaths)
         .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true), file(row[1][1], checkIfExists: true) ] ] }
-        .set { reads }
+        .set { reads_ch }
     }
 } else {
     Channel
         .fromFilePairs(params.reads, size: params.single_end ? 1 : 2)
         .set { reads_ch }
 }
+
+reads_ch.into { unaligned_reads; stats_reads; }
+reads_ch = unaligned_reads
 
 if (params.kraken2_db == "") {
     // skip kraken
@@ -90,6 +93,7 @@ process kraken2 {
 
     input:
     path(db) from kraken2_db
+    path(ref_fasta)
     tuple(sampleName, file(reads)) from kraken2_reads_in
 
     output:
@@ -98,12 +102,21 @@ process kraken2 {
 
     script:
     """
+    minimap2 -ax sr ${ref_fasta} ${reads} |
+      samtools view -O bam -o mapped.bam
+    samtools fastq -G 12 -1 paired1.fq.gz -2 paired2.fq.gz \
+       -0 /dev/null -s /dev/null -n -c 6 \
+       mapped.bam
+    rm mapped.bam
+
     kraken2 --db ${db} \
       --report ${sampleName}.kraken2_report \
       --classified-out "${sampleName}_classified#.fq" \
       --output - \
       --memory-mapping --gzip-compressed --paired \
-      ${reads}
+      paired1.fq.gz paired2.fq.gz
+
+    rm paired1.fq.gz paired2.fq.gz
 
     grep --no-group-separator -A3 "kraken:taxid|2697049" \
          ${sampleName}_classified_1.fq \
@@ -173,7 +186,7 @@ process alignReads {
     path(ref_fasta)
 
     output:
-    tuple(sampleName, file("${sampleName}.bam")) into aligned_reads
+    tuple(sampleName, file("${sampleName}.bam")) into bam2trimPrimers
 
     script:
     """
@@ -181,8 +194,6 @@ process alignReads {
       samtools sort -@ 2 -O bam -o ${sampleName}.bam
     """
 }
-
-aligned_reads.into { bam2trimPrimers; rawBam2stats }
 
 process trimPrimers {
 	tag { sampleName }
@@ -207,7 +218,7 @@ process trimPrimers {
     """
 }
 
-trimmed_bam_ch.into { quast_bam; consensus_bam; stats_bam; }
+trimmed_bam_ch.into { quast_bam; consensus_bam; stats_bam }
 
 process makeConsensus {
 	tag { sampleName }
@@ -275,7 +286,7 @@ process callVariants {
     """
 }
 
-rawBam2stats
+stats_reads
     .join(stats_bam)
     .join(stats_fa)
     .join(sample_variants_vcf)
@@ -286,7 +297,7 @@ process computeStats {
 
     input:
     tuple(sampleName,
-          file(raw_bam),
+          file(reads),
           file(trimmed_filtered_bam),
           file(in_fa),
           file(in_vcf)) from stats_ch_in
@@ -299,16 +310,15 @@ process computeStats {
     script:
     """
     samtools index ${trimmed_filtered_bam}
-    samtools index ${raw_bam}
     samtools stats ${trimmed_filtered_bam} > ${sampleName}.samtools_stats
     alignment_assembly_stats.py \
         --sample_name ${sampleName} \
-        --raw_bam ${raw_bam} \
         --cleaned_bam ${trimmed_filtered_bam} \
         --samtools_stats ${sampleName}.samtools_stats \
         --assembly ${in_fa} \
         --vcf ${in_vcf} \
-        --out_prefix ${sampleName}
+        --out_prefix ${sampleName} \
+        --reads ${reads}
     """
 }
 

@@ -4,6 +4,7 @@ import argparse
 import collections
 import json
 import re
+import subprocess
 import pysam
 from Bio import SeqIO
 import numpy as np
@@ -12,12 +13,12 @@ import seaborn as sns
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--sample_name")
-parser.add_argument("--raw_bam")
 parser.add_argument("--cleaned_bam")
 parser.add_argument("--assembly")
 parser.add_argument("--samtools_stats")
 parser.add_argument("--vcf")
 parser.add_argument("--out_prefix")
+parser.add_argument("--reads", nargs="+")
 args = parser.parse_args()
 
 stats = {"sample_name": args.sample_name}
@@ -36,8 +37,9 @@ stats["avg_depth"] = depths.mean()
 seq, = SeqIO.parse(args.assembly, "fasta")
 stats["allele_counts"] = dict(collections.Counter(str(seq.seq)))
 
-raw_samfile = pysam.AlignmentFile(args.raw_bam, "rb")
-stats["total_reads"] = raw_samfile.mapped + raw_samfile.unmapped
+fq_lines = subprocess.run(" ".join(["zcat"] + list(args.reads)) + " | wc -l",
+                          shell=True, stdout=subprocess.PIPE).stdout
+stats["total_reads"] = int(int(fq_lines) / 4)
 
 with open(args.samtools_stats) as f:
     sam_stats_re = re.compile(r"SN\s+([^\s].*):\s+(\d+)")
