@@ -102,7 +102,7 @@ process kraken2 {
     script:
     """
     minimap2 -ax sr ${ref_fasta} ${reads} |
-      samtools view -O bam -o mapped.bam
+      samtools sort -n -O bam -o mapped.bam
     samtools fastq -G 12 -1 paired1.fq.gz -2 paired2.fq.gz \
        -0 /dev/null -s /dev/null -n -c 6 \
        mapped.bam
