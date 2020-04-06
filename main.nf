@@ -60,48 +60,18 @@ if (params.readPaths) {
         Channel
         .fromList(params.readPaths)
         .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true)] ] }
-        .into { reads }
+        .set { reads }
     } else {
         Channel
         .fromList(params.readPaths)
         .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true), file(row[1][1], checkIfExists: true) ] ] }
-        .into { reads }
+        .set { reads }
     }
 } else {
     Channel
         .fromFilePairs(params.reads, size: params.single_end ? 1 : 2)
-        .into { reads_ch }
+        .set { reads_ch }
 }
-
-if (params.skip_trim_adapters) {
-    // skip trimming
-    trimgalore_reads_in = Channel.empty()
-} else {
-    // send reads to trim_galore, and empty the reads channel
-    trimgalore_reads_in = reads_ch
-    reads_ch = Channel.empty()
-}
-
-process trimReads {
-    tag { sampleName }
-
-    cpus 2
-
-    input:
-    tuple(sampleName, file(reads)) from trimgalore_reads_in
-
-    output:
-    tuple(sampleName, file("*_val_*.fq.gz")) into trimgalore_reads_out
-    path("*") into trimmed_reports
-
-    script:
-    """
-    trim_galore --fastqc --paired ${reads}
-    """
-}
-
-// send trim_galore output back to the reads channel
-reads_ch = reads_ch.concat(trimgalore_reads_out)
 
 if (params.kraken2_db == "") {
     // skip kraken
@@ -152,6 +122,43 @@ process kraken2 {
 
 //send kraken output back to the reads channel
 reads_ch = reads_ch.concat(kraken2_reads_out)
+
+if (params.skip_trim_adapters) {
+    // skip trimming
+    trimgalore_reads_in = Channel.empty()
+} else {
+    // send reads to trim_galore, and empty the reads channel
+    trimgalore_reads_in = reads_ch
+    reads_ch = Channel.empty()
+}
+
+process trimReads {
+    tag { sampleName }
+
+    cpus 2
+
+    input:
+    tuple(sampleName, file(reads)) from trimgalore_reads_in
+
+    output:
+    tuple(sampleName, file("*_val_*.fq.gz")) into trimgalore_reads_out
+    path("*") into trimmed_reports
+
+    script:
+    """
+    LINES=\$(zcat ${reads[0]} | wc -l)
+    if [ "\$LINES" -gt 0 ];
+    then
+        trim_galore --fastqc --paired ${reads}
+    else
+        cp ${reads[0]} ${sampleName}_1_val_1.fq.gz
+        cp ${reads[1]} ${sampleName}_2_val_2.fq.gz
+    fi
+    """
+}
+
+// send trim_galore output back to the reads channel
+reads_ch = reads_ch.concat(trimgalore_reads_out)
 
 // send reads to minimap2 and quast
 reads_ch.into { minimap2_reads_in; quast_reads }
