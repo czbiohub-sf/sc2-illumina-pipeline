@@ -163,6 +163,7 @@ process alignReads {
 
     input:
     tuple(sampleName, file(reads)) from minimap2_reads_in
+    path(ref_fasta)
 
     output:
     tuple(sampleName, file("${sampleName}.bam")) into aligned_reads
@@ -182,6 +183,7 @@ process trimPrimers {
 
     input:
     tuple(sampleName, file(alignment)) from bam2trimPrimers
+    path(primer_bed)
 
     output:
     tuple(sampleName, file("${sampleName}.primertrimmed.bam")) into trimmed_bam_ch;
@@ -229,6 +231,7 @@ process realignConsensus {
 
     input:
     tuple(sampleName, path(in_fa)) from realign_fa
+    path(ref_fasta)
 
     output:
     tuple(sampleName, path("${sampleName}.realigned.bam")) into realigned_bam
@@ -252,6 +255,7 @@ process callVariants {
 
     input:
     tuple(sampleName, path(in_bam)) from call_variants_bam
+    path(ref_fasta)
 
     output:
     tuple(sampleName, path("${sampleName}.vcf")) into sample_variants_vcf
@@ -306,6 +310,7 @@ process combinedVariants {
 
     input:
     path(in_bams) from combined_variants_bams
+    path(ref_fasta)
 
     output:
     path("combined.vcf") into combined_variants_vcf
