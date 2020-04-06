@@ -97,7 +97,6 @@ process kraken2 {
     tuple(sampleName, file(reads)) from kraken2_reads_in
 
     output:
-    tuple(sampleName, "${sampleName}.kraken2_report")
     tuple(sampleName, file("${sampleName}_covid_*.fq.gz")) into kraken2_reads_out
 
     script:
@@ -109,27 +108,34 @@ process kraken2 {
        mapped.bam
     rm mapped.bam
 
-    kraken2 --db ${db} \
-      --report ${sampleName}.kraken2_report \
-      --classified-out "${sampleName}_classified#.fq" \
-      --output - \
-      --memory-mapping --gzip-compressed --paired \
-      paired1.fq.gz paired2.fq.gz
+    LINES=\$(zcat paired1.fq.gz | wc -l)
+    if [ "\$LINES" -gt 0 ];
+    then
+        kraken2 --db ${db} \
+          --report ${sampleName}.kraken2_report \
+          --classified-out "${sampleName}_classified#.fq" \
+          --output - \
+          --memory-mapping --gzip-compressed --paired \
+          paired1.fq.gz paired2.fq.gz
 
-    rm paired1.fq.gz paired2.fq.gz
+        rm paired1.fq.gz paired2.fq.gz
 
-    grep --no-group-separator -A3 "kraken:taxid|2697049" \
-         ${sampleName}_classified_1.fq \
-         > ${sampleName}_covid_1.fq || [[ \$? == 1 ]]
+        grep --no-group-separator -A3 "kraken:taxid|2697049" \
+             ${sampleName}_classified_1.fq \
+             > ${sampleName}_covid_1.fq || [[ \$? == 1 ]]
 
-    grep --no-group-separator -A3 "kraken:taxid|2697049" \
-         ${sampleName}_classified_2.fq \
-         > ${sampleName}_covid_2.fq || [[ \$? == 1 ]]
+        grep --no-group-separator -A3 "kraken:taxid|2697049" \
+             ${sampleName}_classified_2.fq \
+             > ${sampleName}_covid_2.fq || [[ \$? == 1 ]]
 
-    gzip ${sampleName}_covid_1.fq
-    gzip ${sampleName}_covid_2.fq
+        gzip ${sampleName}_covid_1.fq
+        gzip ${sampleName}_covid_2.fq
 
-    rm ${sampleName}_classified_*.fq
+        rm ${sampleName}_classified_*.fq
+    else
+        mv paired1.fq.gz ${sampleName}_covid_1.fq.gz
+        mv paired2.fq.gz ${sampleName}_covid_2.fq.gz
+    fi
     """
 }
 
