@@ -26,6 +26,7 @@ def helpMessage() {
       --gisaid_metadata             Metadata for GISAID sequences (default: fetches from github.com/nextstrain/ncov)
       --include_strains             File with included strains after augur filter (default: fetches from github.com/nextstrain/ncov)
       --exclude_strains             File with excluded strains for augur filter (default: fetches from github.com/nextstrain/ncov)
+      --weights                     File with weights for augur traits (default: fetches from github.com/nextstrain/ncov)
       --clades                      File with clade for augur clades (default: fetches from github.com/nextstrain/ncov)
       --auspice_config              Config file for auspice (default: fetches from github.com/nextstrain/ncov)
       --lat_longs                   File with latitudes and longitudes for locations (default: fetches from github.com/nextstrain/ncov)
@@ -593,6 +594,7 @@ process translateSequences {
     """
 }
 
+weights = file(params.weights, checkIfExists: true)
 
 process inferTraits {
     label 'nextstrain'
@@ -601,6 +603,7 @@ process inferTraits {
     input:
     path(tree) from infertraits_tree
     path(metadata) from infertraits_metadata
+    path(weights)
 
     output:
     path('traits.json') into export_traits
@@ -610,6 +613,7 @@ process inferTraits {
     augur traits \
         --tree ${tree} \
         --metadata ${metadata} \
+        --weights ${weights} \
         --output traits.json \
         --columns country_exposure \
         --confidence \
