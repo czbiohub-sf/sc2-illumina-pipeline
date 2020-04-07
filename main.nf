@@ -23,6 +23,7 @@ def helpMessage() {
       --maxNs                       Max number of Ns to allow assemblies to pass QC
       --minLength                   Minimum base pair length to allow assemblies to pass QC
       --no_reads_quast              Run QUAST without aligning reads
+      --qpcr_primers                BED file with positions of qPCR primers to check for variants
       --gisaid_metadata             Metadata for GISAID sequences (default: fetches from github.com/nextstrain/ncov)
       --include_strains             File with included strains after augur filter (default: fetches from github.com/nextstrain/ncov)
       --exclude_strains             File with excluded strains for augur filter (default: fetches from github.com/nextstrain/ncov)
@@ -286,13 +287,40 @@ process callVariants {
     path(ref_fasta)
 
     output:
-    tuple(sampleName, path("${sampleName}.vcf")) into sample_variants_vcf
+    tuple(sampleName, path("${sampleName}.vcf")) into (sample_variants_vcf, primer_variants_ch)
 
     script:
     """
     bcftools mpileup -f ${ref_fasta} ${in_bam} |
       bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
       > ${sampleName}.vcf
+    """
+}
+
+if (params.qpcr_primers) {
+    qpcr_primers = file(params.qpcr_primers, checkIfExists: true)
+} else {
+    qpcr_primers = Channel.empty()
+}
+
+process searchPrimers {
+    publishDir "${params.outdir}", mode: 'copy'
+
+    input:
+    tuple(sampleName, path(vcf)) from primer_variants_ch
+    path(qpcr_primers)
+
+    output:
+    path('primer_variants.vcf')
+
+    when:
+    params.qpcr_primers
+
+    script:
+    """
+    bgzip ${vcf}
+    bcftools index ${vcf}.gz
+    bcftools view -R ${qpcr_primers} -o primer_variants.vcf ${vcf}.gz
     """
 }
 
@@ -400,6 +428,7 @@ process filterAssemblies {
         --out_prefix filtered
     """
 }
+
 
 // Set up GISAID files
 if (params.gisaid_sequences != "") {
@@ -729,22 +758,22 @@ process exportData {
 //    """
 //}
 //
-//process multiqc {
-//	publishDir "${params.outdir}/MultiQC", mode: 'copy'
-//
-//    input:
-//    path(trim_galore_results) from trimmed_reports.collect().ifEmpty([])
-//    path("quast_results/*/*") from multiqc_quast.collect()
-//    path(samtools_stats) from samtools_stats_out.collect()
-//    path(multiqc_config)
-//
-//    output:
-//    path("*multiqc_report.html")
-//    path("*_data")
-//    path("multiqc_plots")
-//
-//	script:
-//	"""
-//	multiqc -f --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} quast_results/
-//	"""
-//}
+process multiqc {
+	publishDir "${params.outdir}/MultiQC", mode: 'copy'
+
+   input:
+   path(trim_galore_results) from trimmed_reports.collect().ifEmpty([])
+   // path("quast_results/*/*") from multiqc_quast.collect()
+   path(samtools_stats) from samtools_stats_out.collect()
+   path(multiqc_config)
+
+   output:
+   path("*multiqc_report.html")
+   path("*_data")
+   path("multiqc_plots")
+
+	script:
+	"""
+	multiqc -f -ip --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} quast_results/
+	"""
+}
