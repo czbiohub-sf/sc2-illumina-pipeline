@@ -24,6 +24,7 @@ def helpMessage() {
       --maxNs                       Max number of Ns to allow assemblies to pass QC
       --minLength                   Minimum base pair length to allow assemblies to pass QC
       --no_reads_quast              Run QUAST without aligning reads
+      --qpcr_primers                BED file with positions of qPCR primers to check for variants
       --gisaid_metadata             Metadata for GISAID sequences (default: fetches from github.com/nextstrain/ncov)
       --include_strains             File with included strains after augur filter (default: fetches from github.com/nextstrain/ncov)
       --exclude_strains             File with excluded strains for augur filter (default: fetches from github.com/nextstrain/ncov)
@@ -286,13 +287,44 @@ process callVariants {
     path(ref_fasta)
 
     output:
-    tuple(sampleName, path("${sampleName}.vcf")) into sample_variants_vcf
+    tuple(sampleName, path("${sampleName}.vcf")) into (sample_variants_vcf, primer_variants_ch)
+    path("${sampleName}.bcftools_stats") into bcftools_stats_ch
 
     script:
     """
     bcftools mpileup -f ${ref_fasta} ${in_bam} |
       bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
       > ${sampleName}.vcf
+    bcftools stats ${sampleName}.vcf > ${sampleName}.bcftools_stats
+    """
+}
+
+if (params.qpcr_primers) {
+    qpcr_primers = file(params.qpcr_primers, checkIfExists: true)
+} else {
+    qpcr_primers = Channel.empty()
+}
+
+process searchPrimers {
+    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
+
+    input:
+    tuple(sampleName, path(vcf)) from primer_variants_ch
+    path(qpcr_primers)
+
+    output:
+    tuple(sampleName, path("${sampleName}_primers.vcf")) into primer_variants_vcf
+    path("${sampleName}_primers.primer_variants_stats") into primer_stats_ch
+
+    when:
+    params.qpcr_primers
+
+    script:
+    """
+    bgzip ${vcf}
+    bcftools index ${vcf}.gz
+    bcftools view -R ${qpcr_primers} -o ${sampleName}_primers.vcf ${vcf}.gz
+    bcftools stats ${sampleName}_primers.vcf > ${sampleName}_primers.primer_variants_stats
     """
 }
 
@@ -300,6 +332,7 @@ stats_reads
     .join(stats_bam)
     .join(stats_fa)
     .join(sample_variants_vcf)
+    .join(primer_variants_vcf)
     .set { stats_ch_in }
 
 process computeStats {
@@ -310,7 +343,8 @@ process computeStats {
           file(reads),
           file(trimmed_filtered_bam),
           file(in_fa),
-          file(in_vcf)) from stats_ch_in
+          file(in_vcf),
+          file(primer_vcf)) from stats_ch_in
 
     output:
     file("${sampleName}.samtools_stats") into samtools_stats_out
@@ -327,6 +361,7 @@ process computeStats {
         --samtools_stats ${sampleName}.samtools_stats \
         --assembly ${in_fa} \
         --vcf ${in_vcf} \
+        --primervcf ${primer_vcf} \
         --out_prefix ${sampleName} \
         --reads ${reads}
     """
@@ -400,6 +435,7 @@ process filterAssemblies {
         --out_prefix filtered
     """
 }
+
 
 // Set up GISAID files
 if (params.gisaid_sequences != "") {
@@ -734,6 +770,8 @@ process multiqc {
    // path("quast_results/*/*") from multiqc_quast.collect()
    path(samtools_stats) from samtools_stats_out.collect()
    path(multiqc_config)
+   path(bcftools_stats) from bcftools_stats_ch.collect().ifEmpty([])
+   path(primer_stats) from primer_stats_ch.collect().ifEmpty([])
 
    output:
    path("*multiqc_report.html")
@@ -745,6 +783,6 @@ process multiqc {
 	// multiqc -f -ip --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} quast_results/
 	// """
     """
-    multiqc -f -ip --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats}
+    multiqc -f -ip --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} ${bcftools_stats} ${primer_stats}
     """
 }

@@ -17,6 +17,7 @@ parser.add_argument("--cleaned_bam")
 parser.add_argument("--assembly")
 parser.add_argument("--samtools_stats")
 parser.add_argument("--vcf")
+parser.add_argument("--primervcf")
 parser.add_argument("--out_prefix")
 parser.add_argument("--reads", nargs="+")
 args = parser.parse_args()
@@ -72,6 +73,21 @@ for rec in vcf.fetch():
             stats["snps"] += 1
         else:
             stats["mnps"] += 1
+
+primervcf = pysam.VariantFile(args.primervcf)
+stats["primer_snps"] = 0
+stats["primer_mnps"] = 0
+stats["primer_indels"] = 0
+for rec in primervcf.fetch():
+    allele_lens = set([len(a) for a in [rec.ref] + list(rec.alts)])
+    if len(allele_lens) > 1:
+        stats["primer_indels"] += 1
+    else:
+        l, = allele_lens
+        if l == 1:
+            stats["primer_snps"] += 1
+        else:
+            stats["primer_mnps"] += 1
 
 with open(args.out_prefix + ".stats.json", "w") as f:
     json.dump(stats, f, indent=2)
