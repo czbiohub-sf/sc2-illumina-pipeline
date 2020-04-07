@@ -288,12 +288,14 @@ process callVariants {
 
     output:
     tuple(sampleName, path("${sampleName}.vcf")) into (sample_variants_vcf, primer_variants_ch)
+    path("${sampleName}.bcftools_stats") into bcftools_stats_ch
 
     script:
     """
     bcftools mpileup -f ${ref_fasta} ${in_bam} |
       bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
       > ${sampleName}.vcf
+    bcftools stats ${sampleName}.vcf > ${sampleName}.bcftools_stats
     """
 }
 
@@ -311,8 +313,8 @@ process searchPrimers {
     path(qpcr_primers)
 
     output:
-    tuple(sampleName, path('primer_variants.vcf')) into primer_variants_vcf
-    path("${sampleName}_primers.primer_variants_stats") into bcftools_stats_ch
+    tuple(sampleName, path("${sampleName}_primers.vcf")) into primer_variants_vcf
+    path("${sampleName}_primers.primer_variants_stats") into primer_stats_ch
 
     when:
     params.qpcr_primers
@@ -321,8 +323,8 @@ process searchPrimers {
     """
     bgzip ${vcf}
     bcftools index ${vcf}.gz
-    bcftools view -R ${qpcr_primers} -o primer_variants.vcf ${vcf}.gz
-    bcftools stats primer_variants.vcf > ${sampleName}_primers.primer_variants_stats
+    bcftools view -R ${qpcr_primers} -o ${sampleName}_primers.vcf ${vcf}.gz
+    bcftools stats ${sampleName}_primers.vcf > ${sampleName}_primers.primer_variants_stats
     """
 }
 
@@ -769,6 +771,7 @@ process multiqc {
    path(samtools_stats) from samtools_stats_out.collect()
    path(multiqc_config)
    path(bcftools_stats) from bcftools_stats_ch.collect().ifEmpty([])
+   path(primer_stats) from primer_stats_ch.collect().ifEmpty([])
 
    output:
    path("*multiqc_report.html")
@@ -780,6 +783,6 @@ process multiqc {
 	// multiqc -f -ip --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} quast_results/
 	// """
     """
-    multiqc -f -ip --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} ${bcftools_stats}
+    multiqc -f -ip --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} ${bcftools_stats} ${primer_stats}
     """
 }
