@@ -726,22 +726,25 @@ process exportData {
 //    """
 //}
 //
-//process multiqc {
-//	publishDir "${params.outdir}/MultiQC", mode: 'copy'
-//
-//    input:
-//    path(trim_galore_results) from trimmed_reports.collect().ifEmpty([])
-//    path("quast_results/*/*") from multiqc_quast.collect()
-//    path(samtools_stats) from samtools_stats_out.collect()
-//    path(multiqc_config)
-//
-//    output:
-//    path("*multiqc_report.html")
-//    path("*_data")
-//    path("multiqc_plots")
-//
-//	script:
-//	"""
-//	multiqc -f --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} quast_results/
-//	"""
-//}
+process multiqc {
+	publishDir "${params.outdir}/MultiQC", mode: 'copy'
+
+   input:
+   path(trim_galore_results) from trimmed_reports.collect().ifEmpty([])
+   // path("quast_results/*/*") from multiqc_quast.collect()
+   path(samtools_stats) from samtools_stats_out.collect()
+   path(multiqc_config)
+
+   output:
+   path("*multiqc_report.html")
+   path("*_data")
+   path("multiqc_plots")
+
+	script:
+	// """
+	// multiqc -f -ip --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} quast_results/
+	// """
+    """
+    multiqc -f -ip --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats}
+    """
+}
