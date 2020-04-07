@@ -304,14 +304,15 @@ if (params.qpcr_primers) {
 }
 
 process searchPrimers {
-    publishDir "${params.outdir}", mode: 'copy'
+    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
 
     input:
     tuple(sampleName, path(vcf)) from primer_variants_ch
     path(qpcr_primers)
 
     output:
-    path('primer_variants.vcf')
+    tuple(sampleName, path('primer_variants.vcf')) into primer_variants_vcf
+    path("${sampleName}_primers.primer_variants_stats") into bcftools_stats_ch
 
     when:
     params.qpcr_primers
@@ -321,6 +322,7 @@ process searchPrimers {
     bgzip ${vcf}
     bcftools index ${vcf}.gz
     bcftools view -R ${qpcr_primers} -o primer_variants.vcf ${vcf}.gz
+    bcftools stats primer_variants.vcf > ${sampleName}_primers.primer_variants_stats
     """
 }
 
@@ -328,6 +330,7 @@ stats_reads
     .join(stats_bam)
     .join(stats_fa)
     .join(sample_variants_vcf)
+    .join(primer_variants_vcf)
     .set { stats_ch_in }
 
 process computeStats {
@@ -338,7 +341,8 @@ process computeStats {
           file(reads),
           file(trimmed_filtered_bam),
           file(in_fa),
-          file(in_vcf)) from stats_ch_in
+          file(in_vcf),
+          file(primer_vcf)) from stats_ch_in
 
     output:
     file("${sampleName}.samtools_stats") into samtools_stats_out
@@ -355,6 +359,7 @@ process computeStats {
         --samtools_stats ${sampleName}.samtools_stats \
         --assembly ${in_fa} \
         --vcf ${in_vcf} \
+        --primervcf ${primer_vcf} \
         --out_prefix ${sampleName} \
         --reads ${reads}
     """
@@ -763,6 +768,7 @@ process multiqc {
    // path("quast_results/*/*") from multiqc_quast.collect()
    path(samtools_stats) from samtools_stats_out.collect()
    path(multiqc_config)
+   path(bcftools_stats) from bcftools_stats_ch.collect().ifEmpty([])
 
    output:
    path("*multiqc_report.html")
@@ -774,6 +780,6 @@ process multiqc {
 	// multiqc -f -ip --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} quast_results/
 	// """
     """
-    multiqc -f -ip --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats}
+    multiqc -f -ip --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} ${bcftools_stats}
     """
 }
