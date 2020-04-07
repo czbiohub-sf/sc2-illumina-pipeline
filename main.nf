@@ -252,7 +252,6 @@ process makeConsensus {
 	"""
 }
 
-// TODO: quast breaks on empty assemblies
 process quast {
    tag { sampleName }
    publishDir "${params.outdir}/QUAST", mode: 'copy'
@@ -785,7 +784,4 @@ process multiqc {
 	"""
 	multiqc -f -ip --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} quast_results/ ${bcftools_stats} ${primer_stats}
 	"""
-    // """
-    // multiqc -f -ip --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} ${bcftools_stats} ${primer_stats}
-    // """
 }
