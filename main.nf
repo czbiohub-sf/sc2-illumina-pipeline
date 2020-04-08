@@ -24,13 +24,8 @@ def helpMessage() {
       --maxNs                       Max number of Ns to allow assemblies to pass QC
       --minLength                   Minimum base pair length to allow assemblies to pass QC
       --no_reads_quast              Run QUAST without aligning reads
+      --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
       --qpcr_primers                BED file with positions of qPCR primers to check for variants
-      --gisaid_metadata             Metadata for GISAID sequences (default: fetches from github.com/nextstrain/ncov)
-      --include_strains             File with included strains after augur filter (default: fetches from github.com/nextstrain/ncov)
-      --exclude_strains             File with excluded strains for augur filter (default: fetches from github.com/nextstrain/ncov)
-      --clades                      File with clade for augur clades (default: fetches from github.com/nextstrain/ncov)
-      --auspice_config              Config file for auspice (default: fetches from github.com/nextstrain/ncov)
-      --lat_longs                   File with latitudes and longitudes for locations (default: fetches from github.com/nextstrain/ncov)
       --ref_gb                      Reference Genbank file for augur
 
     Other options:
