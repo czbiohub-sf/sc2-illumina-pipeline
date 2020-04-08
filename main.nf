@@ -327,11 +327,7 @@ process callVariants {
     """
 }
 
-if (params.qpcr_primers) {
-    qpcr_primers = file(params.qpcr_primers, checkIfExists: true)
-} else {
-    qpcr_primers = Channel.empty()
-}
+qpcr_primers = file(params.qpcr_primers, checkIfExists: true)
 
 process searchPrimers {
     publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
