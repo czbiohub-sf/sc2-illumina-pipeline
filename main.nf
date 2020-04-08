@@ -466,13 +466,32 @@ process filterAssemblies {
 
 
 // Set up GISAID files
-if (params.gisaid_sequences != "") {
+
+if (params.nextstrain_ncov != "" && params.gisaid_sequences != "") {
     gisaid_sequences_ch = Channel.from(file(params.gisaid_sequences, checkIfExists: true))
+
+    nextstrain_ncov = params.nextstrain_ncov
+    if (nextstrain_ncov[-1] != "/") {
+        nextstrain_ncov = nextstrain_ncov + "/"
+    }
+
+    gisaid_metadata_path = file(nextstrain_ncov + "data/metadata.tsv", checkIfExists: true)
+    nextstrain_config = nextstrain_ncov + "config/"
+    include_file = file(nextstrain_config + "include.txt", checkIfExists: true)
+    exclude_file = file(nextstrain_config + "exclude.txt", checkIfExists: true)
+    clades = file(nextstrain_config + "clades.tsv", checkIfExists: true)
+    auspice_config = file(nextstrain_config + "auspice_config.json", checkIfExists: true)
+    lat_longs = file(nextstrain_config + "lat_longs.tsv", checkIfExists: true)
 } else {
     gisaid_sequences_ch = Channel.empty()
+    gisaid_metadata_path = Channel.empty()
+    nextstrain_config = Channel.empty()
+    include_file = Channel.empty()
+    exclude_file = Channel.empty()
+    clades = Channel.empty()
+    auspice_config = Channel.empty()
+    lat_longs = Channel.empty()
 }
-
-gisaid_metadata = file(params.gisaid_metadata, checkIfExists: true)
 
 process makeNextstrainInput {
     publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
@@ -481,17 +500,17 @@ process makeNextstrainInput {
     input:
     path(sample_sequences) from nextstrain_ch
     path(gisaid_sequences) from gisaid_sequences_ch
-    path(gisaid_metadata)
+    path(gisaid_metadata_path)
 
     output:
-    path('metadata.tsv') into (nextstrain_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata, export_metadata)
+    path('metadata.tsv') into (gisaid_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata, export_metadata)
     path('sequences.fasta') into nextstrain_sequences
 
     script:
     currdate = new java.util.Date().format('yyyy-MM-dd')
     // Normalize the GISAID names using Nextstrain's bash script
     """
-    make_nextstrain_input.py -ps ${gisaid_sequences} -pm ${gisaid_metadata} -ns ${sample_sequences} --date $currdate \
+    make_nextstrain_input.py -ps ${gisaid_sequences} -pm ${gisaid_metadata_path} -ns ${sample_sequences} --date $currdate \
     -r 'North America' -c USA -div 'California' -loc 'San Francisco County' -origlab 'Biohub' -sublab 'Biohub' \
     -subdate $currdate
 
@@ -500,16 +519,13 @@ process makeNextstrainInput {
 
 }
 
-include_file = file(params.include_strains, checkIfExists: true)
-exclude_file = file(params.exclude_strains, checkIfExists: true)
-
 process filterStrains {
     label 'nextstrain'
     publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
     input:
     path(sequences) from nextstrain_sequences
-    path(metadata) from nextstrain_metadata
+    path(metadata) from gisaid_metadata
     path(include_file)
     path(exclude_file)
 
@@ -682,8 +698,6 @@ process inferTraits {
     """
 }
 
-clades = file(params.clades, checkIfExists: true)
-
 process addClades {
     label 'nextstrain'
     publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
@@ -730,9 +744,6 @@ process tipFrequencies {
         --output ncov_tip-frequencies.json
     """
 }
-
-auspice_config = file(params.auspice_config, checkIfExists: true)
-lat_longs = file(params.lat_longs, checkIfExists: true)
 
 process exportData {
     label 'nextstrain'
