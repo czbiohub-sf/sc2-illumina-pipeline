@@ -31,6 +31,7 @@ def helpMessage() {
       --clades                      File with clade for augur clades (default: fetches from github.com/nextstrain/ncov)
       --auspice_config              Config file for auspice (default: fetches from github.com/nextstrain/ncov)
       --lat_longs                   File with latitudes and longitudes for locations (default: fetches from github.com/nextstrain/ncov)
+      --ref_gb                      Reference Genbank file for augur
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -239,7 +240,7 @@ process makeConsensus {
 	tuple(sampleName, path(bam)) from consensus_bam
 
 	output:
-	tuple(sampleName, path("${sampleName}.consensus.fa")) into consensus_fa
+	tuple(sampleName, path("${sampleName}.consensus.fa")) into (consensus_fa, quast_ch)
 
 	script:
 	"""
@@ -249,6 +250,33 @@ process makeConsensus {
         echo '>${sampleName}' > ${sampleName}.consensus.fa
         seqtk seq -l 50 ${sampleName}.primertrimmed.consensus.fa | tail -n +2 >> ${sampleName}.consensus.fa
 	"""
+}
+
+process quast {
+   tag { sampleName }
+   publishDir "${params.outdir}/QUAST", mode: 'copy'
+
+   input:
+   tuple(sampleName, path(assembly)) from quast_ch
+   tuple(sampleName, path(bam)) from quast_bam
+   tuple(sample, path(reads)) from quast_reads
+   path(ref_fasta)
+
+   output:
+   // Avoid name clash with other samples for MultiQC
+   path("${sampleName}/*") into multiqc_quast
+
+   script:
+   if (params.no_reads_quast)
+   """
+   run_quast.py --noreads --assembly ${assembly} --sample ${sampleName} --ref ${ref_fasta} \
+    --threads ${task.cpus} --bam ${bam}
+   """
+   else
+   """
+   run_quast.py --noreads --assembly ${assembly} --sample ${sampleName} --ref ${ref_fasta} \
+    --threads ${task.cpus} --bam ${bam} --R1 ${reads[0]} --R2 ${reads[1]}
+   """
 }
 
 consensus_fa.into { quast_ch; stats_fa; merge_fastas_ch; realign_fa }
@@ -736,38 +764,12 @@ process exportData {
     """
 }
 
-// TODO: quast breaks on empty assemblies
-//process quast {
-//    tag { sampleName }
-//    publishDir "${params.outdir}/QUAST", mode: 'copy'
-//
-//    input:
-//    tuple(sampleName, path(assembly)) from quast_ch
-//    tuple(sampleName, path(bam)) from quast_bam
-//    tuple(sample, path(reads)) from quast_reads
-//
-//    output:
-//    // Avoid name clash with other samples for MultiQC
-//    path("${sampleName}/*")
-//    path("${sampleName}/report.tsv") into multiqc_quast
-//
-//    script:
-//    if (params.no_reads_quast)
-//    """
-//    quast --min-contig 0 -o ${sampleName} -r ${ref_fasta} -t ${task.cpus} --ref-bam ${bam} $assembly
-//    """
-//    else
-//    """
-//    quast --min-contig 0 -o ${sampleName} -r ${ref_fasta} -t ${task.cpus} -1 ${reads[0]} -2 ${reads[1]} --ref-bam ${bam} $assembly
-//    """
-//}
-//
 process multiqc {
 	publishDir "${params.outdir}/MultiQC", mode: 'copy'
 
    input:
    path(trim_galore_results) from trimmed_reports.collect().ifEmpty([])
-   // path("quast_results/*/*") from multiqc_quast.collect()
+   path("quast_results/*/*") from multiqc_quast.collect()
    path(samtools_stats) from samtools_stats_out.collect()
    path(multiqc_config)
    path(bcftools_stats) from bcftools_stats_ch.collect().ifEmpty([])
@@ -779,10 +781,7 @@ process multiqc {
    path("multiqc_plots")
 
 	script:
-	// """
-	// multiqc -f -ip --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} quast_results/
-	// """
-    """
-    multiqc -f -ip --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} ${bcftools_stats} ${primer_stats}
-    """
+	"""
+	multiqc -f -ip --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} quast_results/ ${bcftools_stats} ${primer_stats}
+	"""
 }
