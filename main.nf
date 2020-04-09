@@ -575,8 +575,8 @@ process filterStrains {
             --include ${include_file} \
             --exclude ${exclude_file} \
             --exclude-where ${exclude_where} \
-            --min-length 25000 \
-            --group-by 'division year month' \
+            --min-length ${params.minLength} \
+            --group-by division year month \
             --sequences-per-group 300 \
             --output filtered.fasta
     """
