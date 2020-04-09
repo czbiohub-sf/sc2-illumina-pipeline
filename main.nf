@@ -27,6 +27,7 @@ def helpMessage() {
       --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
       --qpcr_primers                BED file with positions of qPCR primers to check for variants
       --ref_gb                      Reference Genbank file for augur
+      --clades                      TSV file with columns clade, gene, site, alt (augur clades format)
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -310,7 +311,7 @@ process callVariants {
     path(ref_fasta)
 
     output:
-    tuple(sampleName, path("${sampleName}.vcf")) into (sample_variants_vcf, primer_variants_ch)
+    tuple(sampleName, path("${sampleName}.vcf")) into (sample_variants_vcf, primer_variants_ch, assignclades_ch)
     path("${sampleName}.bcftools_stats") into bcftools_stats_ch
 
     script:
@@ -319,6 +320,44 @@ process callVariants {
       bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
       > ${sampleName}.vcf
     bcftools stats ${sampleName}.vcf > ${sampleName}.bcftools_stats
+    """
+}
+
+clades = file(params.clades, checkIfExists: true)
+
+process assignClades {
+    // Use Nextstrain definitions to assign clades based on mutations
+
+    input:
+    tuple(sampleName, path(vcf)) from assignclades_ch
+    path(ref_gb)
+    path(clades)
+
+    output:
+    path("${sampleName}_clade.tsv") into collectclades_ch
+
+    script:
+    """
+    assignclades.py --reference ${ref_gb} --clades ${clades} --vcf ${vcf} --sample ${sampleName}
+    """
+    
+}
+
+process collectClades {
+    publishDir "${params.outdir}", mode: 'copy'
+    input:
+    path(clades) from collectclades_ch.collect()
+
+    output:
+    path("sample_clades.tsv")
+
+    script:
+    """
+    echo 'sample\tclade' > sample_clades.tsv
+    for f in ${clades}
+    do
+    sed '1d' \$f >> sample_clades.tsv
+    done
     """
 }
 
