@@ -54,6 +54,7 @@ for index, row in clades_df.iterrows():
     else:
         clades[row['clade']] = [allele]
 
+# Store clades in a set in case more than one clade has all conditions fulfilled
 sample_clade = set()
 
 for clade in clades:
