@@ -7,14 +7,16 @@ import shutil
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--csv', help='sourmash search output CSV')
+parser.add_argument('--tsv', help='blast output TSV')
 parser.add_argument('--sequences', help='FASTA file of reference sequences')
 parser.add_argument('--default', help='reference sequence if no hits')
 args = parser.parse_args()
 
-sourmash_out = pd.read_csv(args.csv)
+df = pd.read_csv(args.csv, sep='\t', names=['sacc', 'nident', 'pident',
+                                                      'length', 'mismatch', 'gapopen', 'qstart'.
+                                                      'qend', 'sstart', 'send', 'evalue', 'bitscore'])
 try:
-    top_hit = sourmash_out['name'][0]
+    top_hit = df['sacc'][0]
     sequences = SeqIO.index(args.sequences, 'fasta')
     top_hit_seq = sequences[top_hit]
     SeqIO.write(top_hit_seq, 'nearest_gisaid.fasta', 'fasta')

@@ -245,7 +245,7 @@ process makeConsensus {
 	tuple(sampleName, path(bam)) from consensus_bam
 
 	output:
-	tuple(sampleName, path("${sampleName}.consensus.fa")) into (consensus_fa, quast_ch, sketchconsensus_ch, realign_to_neighbor_ch)
+	tuple(sampleName, path("${sampleName}.consensus.fa")) into (consensus_fa, quast_ch, compareconsensus_ch, consensustoneighbor_ch)
 
 	script:
 	"""
@@ -259,13 +259,13 @@ process makeConsensus {
 
 compare_sequences = params.gisaid_sequences ? file(params.gisaid_sequences, checkIfExists: true) : Channel.empty()
 
-process sketchGISAID {
+process buildBLASTDB {
 
     input:
     path(compare_sequences)
 
     output:
-    path("gisaid_sequences.fasta.sig") into sketch_ch
+    path("gisaid.nt*") into blastdb_ch
     path("gisaid_sequences.fasta") into gisaid_clean_ch
 
     when:
@@ -273,57 +273,36 @@ process sketchGISAID {
 
     script:
     """
-    normalize_gisaid_fasta.sh ${compare_sequences} gisaid_sequences.fasta
+    normalize_gisaid_fasta.sh ${compare_sequences} gisaid_clean.fasta
+    sed 's/\.//g' gisaid_clean.fasta > gisaid_sequences.fasta
 
-    sourmash compute -k ${params.ksize} --scaled ${params.scaled} \
-     --singleton -o gisaid_sequences.fasta.sig gisaid_sequences.fasta
-    """
-
-}
-
-process sketchConsensus {
-    tag {sampleName}
-
-    input:
-    tuple(sampleName, path(assembly)) from sketchconsensus_ch
-
-    output:
-    tuple(sampleName, path("${assembly}.sig")) into compareconsensus_ch
-
-    when:
-    params.gisaid_sequences
-
-    script:
-    """
-    sourmash compute -k ${params.ksize} --scaled ${params.scaled} ${assembly}
+    makeblastdb -in gisaid_sequences.fasta -parse_seqids -title 'gisaid' -dbtype nucl -out gisaid.nt
     """
 }
 
-process compareConsensus {
+process blastConsensus {
     tag {sampleName}
     publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
 
     input:
-    tuple(sampleName, path(samplesketch)) from compareconsensus_ch
-    path(dbsketch) from sketch_ch
+    tuple(sampleName, path(assembly)) from compareconsensus_ch
     path(dbsequences) from gisaid_clean_ch
     path(ref_fasta)
 
     output:
-    path("${samplesketch}.csv")
+    path("${sampleName}.blast.tsv")
     tuple(sampleName, path("nearest_gisaid.fasta")) into nearest_neighbor
-
 
     script:
     """
-    sourmash search -k ${params.ksize} ${samplesketch} ${dbsketch} -o ${samplesketch}.csv
-    get_top_hit.py --csv ${samplesketch}.csv --sequences ${dbsequences} --default ${ref_fasta}
+    blastn -db gisaid.nt -query ${assembly} -num_threads 32 -out ${sampleName}.blast.tsv \
+     -outfmt '6 sacc nident pident length mismatch gapopen qstart qend sstart send evalue bitscore'
+    get_top_hit.py --tsv ${sampleName}.blast.tsv --sequences ${dbsequences} --default ${ref_fasta}
     """
-
 }
 
 nearest_neighbor
-    .join(realign_to_neighbor_ch)
+    .join(consensustoneighbor_ch)
     .set{nearest_gisaid_ch}
 
 process nearestVariants {
