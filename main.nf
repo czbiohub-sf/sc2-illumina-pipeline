@@ -274,7 +274,7 @@ process buildBLASTDB {
     script:
     """
     normalize_gisaid_fasta.sh ${compare_sequences} gisaid_clean.fasta
-    sed 's/\.//g' gisaid_clean.fasta > gisaid_sequences.fasta
+    sed 's/\\.//g' gisaid_clean.fasta > gisaid_sequences.fasta
 
     makeblastdb -in gisaid_sequences.fasta -parse_seqids -title 'gisaid' -dbtype nucl -out gisaid.nt
     """
