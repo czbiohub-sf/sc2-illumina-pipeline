@@ -323,7 +323,7 @@ process compareConsensus {
 
 nearest_neighbor
     .join(realign_to_neighbor_ch)
-    .into{nearest_gisaid_ch}
+    .set{nearest_gisaid_ch}
 
 process nearestVariants {
     tag {sampleName}
