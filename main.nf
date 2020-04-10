@@ -335,7 +335,7 @@ process nearestVariants {
 
     output:
     path("${sampleName}.nearest_realigned.bcftools_stats") into nearest_realigned_stats
-    path("${sampleName}.nearest_realigned.vcf")
+    path("${sampleName}.nearest_realigned.vcf") into nearest_realigned_vcf
 
 
     script:
@@ -480,6 +480,7 @@ stats_reads
     .join(sample_variants_vcf)
     .join(primer_variants_vcf)
     .join(assignclades_out)
+    .join(nearest_realigned_vcf)
     .set { stats_ch_in }
 
 process computeStats {
@@ -493,7 +494,8 @@ process computeStats {
           file(in_fa),
           file(in_vcf),
           file(primer_vcf),
-          file(in_clades)) from stats_ch_in
+          file(in_clades),
+          file(neighbor_vcf)) from stats_ch_in
 
     output:
     file("${sampleName}.samtools_stats") into samtools_stats_out
@@ -511,6 +513,7 @@ process computeStats {
         --assembly ${in_fa} \
         --vcf ${in_vcf} \
         --primervcf ${primer_vcf} \
+        --neighborvcf ${neighbor_vcf} \
         --clades ${in_clades} \
         --out_prefix ${sampleName} \
         --reads ${reads}
@@ -911,6 +914,7 @@ process multiqc {
    path(multiqc_config)
    path(bcftools_stats) from bcftools_stats_ch.collect().ifEmpty([])
    path(primer_stats) from primer_stats_ch.collect().ifEmpty([])
+   path(nearest_realigned) from nearest_realigned_stats.collect().ifEmpty([])
 
    output:
    path("*multiqc_report.html")
@@ -919,6 +923,7 @@ process multiqc {
 
 	script:
 	"""
-	multiqc -f -ip --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} quast_results/ ${bcftools_stats} ${primer_stats}
+	multiqc -f -ip --config ${multiqc_config} ${trim_galore_results} \
+      ${samtools_stats} quast_results/ ${bcftools_stats} ${primer_stats} ${nearest_realigned}
 	"""
 }
