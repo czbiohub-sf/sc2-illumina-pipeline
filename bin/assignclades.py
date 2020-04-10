@@ -76,8 +76,8 @@ for clade in clades:
                 break
 
 if not sample_clade:
-    sample_clade = 'unknown'
+    sample_clade = ['unknown']
 
-with open(f'{args.sample}_clade.tsv', 'w+') as f:
-    f.write('sample\tclade\n')
-    f.write(f'{args.sample}\t{sample_clade}\n')
+with open(f'{args.sample}.clades', 'w+') as f:
+    for clade in sorted(sample_clade):
+        print(clade, file=f)

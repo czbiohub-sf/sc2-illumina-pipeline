@@ -18,6 +18,7 @@ parser.add_argument("--assembly")
 parser.add_argument("--samtools_stats")
 parser.add_argument("--vcf")
 parser.add_argument("--primervcf")
+parser.add_argument("--clades")
 parser.add_argument("--out_prefix")
 parser.add_argument("--reads", nargs="+")
 args = parser.parse_args()
@@ -88,6 +89,11 @@ for rec in primervcf.fetch():
             stats["primer_snps"] += 1
         else:
             stats["primer_mnps"] += 1
+
+stats["clades"] = []
+with open(args.clades) as f:
+    for line in f:
+        stats["clades"].append(line.strip())
 
 with open(args.out_prefix + ".stats.json", "w") as f:
     json.dump(stats, f, indent=2)

@@ -311,7 +311,7 @@ process callVariants {
     path(ref_fasta)
 
     output:
-    tuple(sampleName, path("${sampleName}.vcf")) into (sample_variants_vcf, primer_variants_ch, assignclades_ch)
+    tuple(sampleName, path("${sampleName}.vcf")) into (sample_variants_vcf, primer_variants_ch, assignclades_in)
     path("${sampleName}.bcftools_stats") into bcftools_stats_ch
 
     script:
@@ -329,35 +329,16 @@ process assignClades {
     // Use Nextstrain definitions to assign clades based on mutations
 
     input:
-    tuple(sampleName, path(vcf)) from assignclades_ch
+    tuple(sampleName, path(vcf)) from assignclades_in
     path(ref_gb)
     path(clades)
 
     output:
-    path("${sampleName}_clade.tsv") into collectclades_ch
+    tuple(sampleName, path("${sampleName}.clades")) into assignclades_out
 
     script:
     """
     assignclades.py --reference ${ref_gb} --clades ${clades} --vcf ${vcf} --sample ${sampleName}
-    """
-    
-}
-
-process collectClades {
-    publishDir "${params.outdir}", mode: 'copy'
-    input:
-    path(clades) from collectclades_ch.collect()
-
-    output:
-    path("sample_clades.tsv")
-
-    script:
-    """
-    echo 'sample\tclade' > sample_clades.tsv
-    for f in ${clades}
-    do
-    sed '1d' \$f >> sample_clades.tsv
-    done
     """
 }
 
@@ -395,6 +376,7 @@ stats_reads
     .join(stats_fa)
     .join(sample_variants_vcf)
     .join(primer_variants_vcf)
+    .join(assignclades_out)
     .set { stats_ch_in }
 
 process computeStats {
@@ -407,7 +389,8 @@ process computeStats {
           file(trimmed_filtered_bam),
           file(in_fa),
           file(in_vcf),
-          file(primer_vcf)) from stats_ch_in
+          file(primer_vcf),
+          file(in_clades)) from stats_ch_in
 
     output:
     file("${sampleName}.samtools_stats") into samtools_stats_out
@@ -425,6 +408,7 @@ process computeStats {
         --assembly ${in_fa} \
         --vcf ${in_vcf} \
         --primervcf ${primer_vcf} \
+        --clades ${in_clades} \
         --out_prefix ${sampleName} \
         --reads ${reads}
     """
