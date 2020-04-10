@@ -24,6 +24,7 @@ def helpMessage() {
       --maxNs                       Max number of Ns to allow assemblies to pass QC
       --minLength                   Minimum base pair length to allow assemblies to pass QC
       --no_reads_quast              Run QUAST without aligning reads
+      --skip_nextstrain             Do not run augur/auspice
       --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
       --qpcr_primers                BED file with positions of qPCR primers to check for variants
       --ref_gb                      Reference Genbank file for augur
@@ -524,6 +525,9 @@ process makeNextstrainInput {
     output:
     path('metadata.tsv') into (gisaid_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata, export_metadata)
     path('sequences.fasta') into nextstrain_sequences
+
+    when:
+    !params.skip_nextstrain
 
     script:
     currdate = new java.util.Date().format('yyyy-MM-dd')
