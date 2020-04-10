@@ -25,6 +25,9 @@ parser.add_argument("--reads", nargs="+")
 args = parser.parse_args()
 
 stats = {"sample_name": args.sample_name}
+primer_vcf = pysam.VariantFile(args.primervcf)
+nearest_neighbor = list(primer_vcf.header.contigs)[0]
+stats["nearest_reference"] = nearest_neighbor
 
 samfile = pysam.AlignmentFile(args.cleaned_bam, "rb")
 ref_len, = samfile.lengths
