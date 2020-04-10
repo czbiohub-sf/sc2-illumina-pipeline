@@ -307,7 +307,7 @@ nearest_neighbor
 
 process nearestVariants {
     tag {sampleName}
-    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
+    publishDir "${params.outdir}/sample-variants", mode: 'copy'
 
     input:
     tuple(sampleName, path(nearest_gisaid), path(assembly)) from nearest_gisaid_ch
