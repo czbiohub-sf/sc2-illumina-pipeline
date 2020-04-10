@@ -89,9 +89,8 @@ if (params.kraken2_db == "") {
     kraken2_db = file(params.kraken2_db, checkIfExists: true)
 }
 
-process kraken2 {
+process filterReads {
     tag { sampleName }
-    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
 
     input:
     path(db) from kraken2_db
@@ -155,6 +154,8 @@ if (params.skip_trim_adapters) {
 
 process trimReads {
     tag { sampleName }
+    publishDir "${params.outdir}/trimmed-reads", mode: 'copy',
+        saveAs: { x -> x.endsWith(".fq.gz") ? x : null }
 
     cpus 2
 
@@ -204,8 +205,8 @@ process alignReads {
 }
 
 process trimPrimers {
-	tag { sampleName }
-	publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
+    tag { sampleName }
+    publishDir "${params.outdir}/aligned-reads", mode: 'copy'
 
     input:
     tuple(sampleName, file(alignment)) from bam2trimPrimers
@@ -214,7 +215,6 @@ process trimPrimers {
     output:
     tuple(sampleName, file("${sampleName}.primertrimmed.bam")) into trimmed_bam_ch;
     file("${sampleName}.primertrimmed.bam.bai")
-    file("${sampleName}.primertrimmed.bam") into combined_vcf_bam
 
     script:
     """
@@ -230,7 +230,7 @@ trimmed_bam_ch.into { quast_bam; consensus_bam; stats_bam }
 
 process makeConsensus {
 	tag { sampleName }
-	publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
+	publishDir "${params.outdir}/consensus-seqs", mode: 'copy'
 
 	input:
 	tuple(sampleName, path(bam)) from consensus_bam
@@ -280,7 +280,7 @@ merge_fastas_ch = merge_fastas_ch.map { it[1] }
 
 process realignConsensus {
     tag { sampleName }
-    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
+    publishDir "${params.outdir}/realigned-seqs", mode: 'copy'
 
     input:
     tuple(sampleName, path(in_fa)) from realign_fa
@@ -304,7 +304,7 @@ combined_variants_bams = combined_variants_bams.map { it[1] }.collect()
 
 process callVariants {
     tag { sampleName }
-    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
+    publishDir "${params.outdir}/sample-variants", mode: 'copy'
 
     input:
     tuple(sampleName, path(in_bam)) from call_variants_bam
@@ -349,7 +349,7 @@ if (params.qpcr_primers) {
 }
 
 process searchPrimers {
-    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
+    publishDir "${params.outdir}/primer-variants", mode: 'copy'
 
     input:
     tuple(sampleName, path(vcf)) from primer_variants_ch
@@ -381,7 +381,8 @@ stats_reads
 
 process computeStats {
     tag { sampleName }
-    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
+    publishDir "${params.outdir}/coverage-plots", mode: 'copy',
+        saveAs: { x -> x.endsWith(".png") ? x : null }
 
     input:
     tuple(sampleName,
