@@ -24,14 +24,10 @@ def helpMessage() {
       --maxNs                       Max number of Ns to allow assemblies to pass QC
       --minLength                   Minimum base pair length to allow assemblies to pass QC
       --no_reads_quast              Run QUAST without aligning reads
+      --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
       --qpcr_primers                BED file with positions of qPCR primers to check for variants
-      --gisaid_metadata             Metadata for GISAID sequences (default: fetches from github.com/nextstrain/ncov)
-      --include_strains             File with included strains after augur filter (default: fetches from github.com/nextstrain/ncov)
-      --exclude_strains             File with excluded strains for augur filter (default: fetches from github.com/nextstrain/ncov)
-      --clades                      File with clade for augur clades (default: fetches from github.com/nextstrain/ncov)
-      --auspice_config              Config file for auspice (default: fetches from github.com/nextstrain/ncov)
-      --lat_longs                   File with latitudes and longitudes for locations (default: fetches from github.com/nextstrain/ncov)
       --ref_gb                      Reference Genbank file for augur
+      --clades                      TSV file with columns clade, gene, site, alt (augur clades format)
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -315,7 +311,7 @@ process callVariants {
     path(ref_fasta)
 
     output:
-    tuple(sampleName, path("${sampleName}.vcf")) into (sample_variants_vcf, primer_variants_ch)
+    tuple(sampleName, path("${sampleName}.vcf")) into (sample_variants_vcf, primer_variants_ch, assignclades_in)
     path("${sampleName}.bcftools_stats") into bcftools_stats_ch
 
     script:
@@ -324,6 +320,25 @@ process callVariants {
       bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
       > ${sampleName}.vcf
     bcftools stats ${sampleName}.vcf > ${sampleName}.bcftools_stats
+    """
+}
+
+clades = file(params.clades, checkIfExists: true)
+
+process assignClades {
+    // Use Nextstrain definitions to assign clades based on mutations
+
+    input:
+    tuple(sampleName, path(vcf)) from assignclades_in
+    path(ref_gb)
+    path(clades)
+
+    output:
+    tuple(sampleName, path("${sampleName}.clades")) into assignclades_out
+
+    script:
+    """
+    assignclades.py --reference ${ref_gb} --clades ${clades} --vcf ${vcf} --sample ${sampleName}
     """
 }
 
@@ -361,6 +376,7 @@ stats_reads
     .join(stats_fa)
     .join(sample_variants_vcf)
     .join(primer_variants_vcf)
+    .join(assignclades_out)
     .set { stats_ch_in }
 
 process computeStats {
@@ -373,7 +389,8 @@ process computeStats {
           file(trimmed_filtered_bam),
           file(in_fa),
           file(in_vcf),
-          file(primer_vcf)) from stats_ch_in
+          file(primer_vcf),
+          file(in_clades)) from stats_ch_in
 
     output:
     file("${sampleName}.samtools_stats") into samtools_stats_out
@@ -391,6 +408,7 @@ process computeStats {
         --assembly ${in_fa} \
         --vcf ${in_vcf} \
         --primervcf ${primer_vcf} \
+        --clades ${in_clades} \
         --out_prefix ${sampleName} \
         --reads ${reads}
     """
@@ -542,8 +560,8 @@ process filterStrains {
             --include ${include_file} \
             --exclude ${exclude_file} \
             --exclude-where ${exclude_where} \
-            --min-length 25000 \
-            --group-by 'division year month' \
+            --min-length ${params.minLength} \
+            --group-by division year month \
             --sequences-per-group 300 \
             --output filtered.fasta
     """

@@ -16,6 +16,7 @@ for fname in sys.argv[1:]:
     row["n_missing"] = allele_counts["N"]
     row["n_gap"] = allele_counts["-"]
     row["n_ambiguous"] = sum(v for k, v in allele_counts.items() if k not in "ACTGUN-")
+    row["clades"] = ";".join(row["clades"])
     rows.append(row)
 
 pd.DataFrame(rows).to_csv(sys.stdout, index=False, sep="\t", float_format="%.1f")
