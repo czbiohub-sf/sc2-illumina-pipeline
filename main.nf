@@ -399,6 +399,7 @@ stats_reads
 
 process computeStats {
     tag { sampleName }
+    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
 
     input:
     tuple(sampleName,
