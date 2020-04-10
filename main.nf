@@ -307,6 +307,7 @@ process compareConsensus {
     tuple(sampleName, path(samplesketch)) from compareconsensus_ch
     path(dbsketch) from sketch_ch
     path(dbsequences) from gisaid_clean_ch
+    path(ref_fasta)
 
     output:
     path("${samplesketch}.csv")
@@ -316,7 +317,7 @@ process compareConsensus {
     script:
     """
     sourmash search -k ${params.ksize} ${samplesketch} ${dbsketch} -o ${samplesketch}.csv
-    get_top_hit.py --csv ${samplesketch}.csv --sequences ${dbsequences}
+    get_top_hit.py --csv ${samplesketch}.csv --sequences ${dbsequences} --default ${ref_fasta}
     """
 
 }
