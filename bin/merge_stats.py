@@ -16,7 +16,15 @@ for fname in sys.argv[1:]:
     row["n_missing"] = allele_counts["N"]
     row["n_gap"] = allele_counts["-"]
     row["n_ambiguous"] = sum(v for k, v in allele_counts.items() if k not in "ACTGUN-")
-    row["clades"] = ";".join(row["clades"])
-    rows.append(row)
+    row["clade"] = ";".join(row["clade"])
 
-pd.DataFrame(rows).to_csv(sys.stdout, index=False, sep="\t", float_format="%.1f")
+    reordered_row = {}
+    for key in [
+            "sample_name", "clade", "depth_avg", "mapped_reads",
+            "total_reads", "n_actg", "n_missing", "n_gap",
+            "n_ambiguous", "snps", "mnps", "indels"]:
+        reordered_row[key] = row.pop(key)
+    reordered_row.update(row)
+    rows.append(reordered_row)
+
+pd.DataFrame(rows).to_csv(sys.stdout, index=False, sep="\t", float_format="%.3f")

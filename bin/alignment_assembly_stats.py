@@ -35,10 +35,21 @@ depths = [0] * ref_len
 for column in samfile.pileup():
     depths[column.reference_pos] = column.nsegments
 depths = np.array(depths)
-sns.lineplot(np.arange(1, ref_len+1), depths)
+
+stats["depth_avg"] = depths.mean()
+stats["depth_q.25"] = np.quantile(depths, .25)
+stats["depth_q.5"] = np.quantile(depths, .5)
+stats["depth_q.75"] = np.quantile(depths, .75)
+stats["depth_frac_above_10x"] = (depths >= 10).mean()
+stats["depth_frac_above_25x"] = (depths >= 30).mean()
+stats["depth_frac_above_50x"] = (depths >= 30).mean()
+stats["depth_frac_above_100x"] = (depths >= 100).mean()
+
+ax = sns.lineplot(np.arange(1, ref_len+1), depths)
+ax.set_title(args.sample_name)
+ax.set(xlabel="position", ylabel="depth")
 plt.yscale("symlog")
 plt.savefig(args.out_prefix + ".depths.png")
-stats["avg_depth"] = depths.mean()
 
 seq, = SeqIO.parse(args.assembly, "fasta")
 stats["allele_counts"] = dict(collections.Counter(str(seq.seq)))
@@ -53,15 +64,15 @@ with open(args.samtools_stats) as f:
         matched = sam_stats_re.match(line)
         if matched:
             if matched.group(1) == "reads mapped":
-                stats["mapped"] = int(matched.group(2))
+                stats["mapped_reads"] = int(matched.group(2))
             elif matched.group(1) == "reads mapped and paired":
                 stats["mapped_paired"] = int(matched.group(2))
             elif matched.group(1) == "inward oriented pairs":
-                stats["pairs_inward"] = int(matched.group(2)) * 2
+                stats["paired_inward"] = int(matched.group(2)) * 2
             elif matched.group(1) == "outward oriented pairs":
-                stats["pairs_outward"] = int(matched.group(2)) * 2
+                stats["paired_outward"] = int(matched.group(2)) * 2
             elif matched.group(1) == "pairs with other orientation":
-                stats["pairs_other_orientation"] = int(matched.group(2)) * 2
+                stats["paired_other_orientation"] = int(matched.group(2)) * 2
             # TODO: number of discordant read pairs
 
 def countVCF(vcf_file, snpcol, mnpcol, indelcol, statsdict):
@@ -85,10 +96,10 @@ stats = {**stats, **countVCF(args.vcf, 'snps', 'mnps', 'indels', stats)}
 stats = {**stats, **countVCF(args.primervcf, 'primer_snps', 'primer_mnps', 'primer_indels', stats)}
 stats = {**stats, **countVCF(args.neighborvcf, 'nearest_ref_snps', 'nearest_ref_mnps', 'nearest_ref_indels', stats)}
 
-stats["clades"] = []
+stats["clade"] = []
 with open(args.clades) as f:
     for line in f:
-        stats["clades"].append(line.strip())
+        stats["clade"].append(line.strip())
 
 with open(args.out_prefix + ".stats.json", "w") as f:
     json.dump(stats, f, indent=2)
