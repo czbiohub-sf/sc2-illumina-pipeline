@@ -287,6 +287,7 @@ process blastConsensus {
     input:
     tuple(sampleName, path(assembly)) from compareconsensus_ch
     path(dbsequences) from gisaid_clean_ch
+    path(blastdb) from blastdb_ch
     path(ref_fasta)
 
     output:
