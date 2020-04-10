@@ -335,7 +335,7 @@ process nearestVariants {
 
     output:
     path("${sampleName}.nearest_realigned.bcftools_stats") into nearest_realigned_stats
-    path("${sampleName}.nearest_realigned.vcf") into nearest_realigned_vcf
+    tuple(sampleName, path("${sampleName}.nearest_realigned.vcf")) into nearest_realigned_vcf
 
 
     script:
