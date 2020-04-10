@@ -18,3 +18,4 @@ dependencies:
   - seaborn=0.10.0
   - biopython=1.76 
   - pysam=0.15.4
+  - sourmash=3.2.2
