@@ -78,9 +78,9 @@ def countVCF(vcf_file, snpcol, mnpcol, indelcol, statsdict):
                 statsdict[mnpcol] += 1
     return statsdict
 
-stats = {**stats, **countVCF(args.vcf, 'snps', 'mnps', 'indels')}
-stats = {**stats, **countVCF(args.primervcf, 'primer_snps', 'primer_mnps', 'primer_indels')}
-stats = {**stats, **countVCF(args.neighborvcf, 'nearest_ref_snps', 'nearest_ref_mnps', 'nearest_ref_indels')}
+stats = {**stats, **countVCF(args.vcf, 'snps', 'mnps', 'indels', stats)}
+stats = {**stats, **countVCF(args.primervcf, 'primer_snps', 'primer_mnps', 'primer_indels', stats)}
+stats = {**stats, **countVCF(args.neighborvcf, 'nearest_ref_snps', 'nearest_ref_mnps', 'nearest_ref_indels', stats)}
 
 stats["clades"] = []
 with open(args.clades) as f:
