@@ -13,10 +13,11 @@ def helpMessage() {
       --reads                       Path to reads, must be in quotes
       --primers                     Path to BED file of primers
       --ref                         Path to FASTA reference sequence
+      --ref_gb                      Reference Genbank file for augur
       --gisaid_sequences            GISAID FASTA
 
 
-    Options:
+    Consensus calling options:
       --kraken2_db                  Path to kraken db (default: "")
       --exclude_samples             comma-separated string of samples to exclude from analysis
       --single_end [bool]           Specifies that the input is single-end reads
@@ -24,11 +25,18 @@ def helpMessage() {
       --maxNs                       Max number of Ns to allow assemblies to pass QC
       --minLength                   Minimum base pair length to allow assemblies to pass QC
       --no_reads_quast              Run QUAST without aligning reads
+      --clades                      TSV file with columns clade, gene, site, alt (augur clades format)
+      --qpcr_primers                BED file with positions of qPCR primers to check for variants
+
+    Sourmash options:
+      --ksize                       kmer size for sourmash compute (default: k=81)
+      --scaled                      scaling for sourmash compute (default: 1000)
+
+
+    Nextstrain options:
       --skip_nextstrain             Do not run augur/auspice
       --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
-      --qpcr_primers                BED file with positions of qPCR primers to check for variants
-      --ref_gb                      Reference Genbank file for augur
-      --clades                      TSV file with columns clade, gene, site, alt (augur clades format)
+
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -237,7 +245,7 @@ process makeConsensus {
 	tuple(sampleName, path(bam)) from consensus_bam
 
 	output:
-	tuple(sampleName, path("${sampleName}.consensus.fa")) into (consensus_fa, quast_ch)
+	tuple(sampleName, path("${sampleName}.consensus.fa")) into (consensus_fa, quast_ch, sketchconsensus_ch, realign_to_neighbor_ch)
 
 	script:
 	"""
@@ -247,6 +255,99 @@ process makeConsensus {
         echo '>${sampleName}' > ${sampleName}.consensus.fa
         seqtk seq -l 50 ${sampleName}.primertrimmed.consensus.fa | tail -n +2 >> ${sampleName}.consensus.fa
 	"""
+}
+
+compare_sequences = params.gisaid_sequences ? file(params.gisaid_sequences, checkIfExists: true) : Channel.empty()
+
+process sketchGISAID {
+
+    input:
+    path(compare_sequences)
+
+    output:
+    path("gisaid_sequences.fasta.sig") into sketch_ch
+    path("gisaid_sequences.fasta") into gisaid_clean_ch
+
+    when:
+    params.gisaid_sequences
+
+    script:
+    """
+    normalize_gisaid_fasta.sh ${compare_sequences} gisaid_sequences.fasta
+
+    sourmash compute -k ${params.ksize} --scaled ${params.scaled} \
+     --singleton -o gisaid_sequences.fasta.sig gisaid_sequences.fasta
+    """
+
+}
+
+process sketchConsensus {
+    tag {sampleName}
+
+    input:
+    tuple(sampleName, path(assembly)) from sketchconsensus_ch
+
+    output:
+    tuple(sampleName, path("${assembly}.sig")) into compareconsensus_ch
+
+    when:
+    params.gisaid_sequences
+
+    script:
+    """
+    sourmash compute -k ${params.ksize} --scaled ${params.scaled} ${assembly}
+    """
+}
+
+process compareConsensus {
+    tag {sampleName}
+    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
+
+    input:
+    tuple(sampleName, path(samplesketch)) from compareconsensus_ch
+    path(dbsketch) from sketch_ch
+    path(dbsequences) from gisaid_clean_ch
+
+    output:
+    path("${samplesketch}.csv")
+    tuple(sampleName, path("nearest_gisaid.fasta")) into nearest_neighbor
+
+
+    script:
+    """
+    sourmash search -k ${params.ksize} ${samplesketch} ${dbsketch} -o ${samplesketch}.csv
+    get_top_hit.py --csv ${samplesketch}.csv --sequences ${dbsequences}
+    """
+
+}
+
+nearest_neighbor
+    .join(realign_to_neighbor_ch)
+    .into{nearest_gisaid_ch}
+
+process nearestVariants {
+    tag {sampleName}
+    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
+
+    input:
+    tuple(sampleName, path(nearest_gisaid), path(assembly)) from nearest_gisaid_ch
+
+    output:
+    path("${sampleName}.nearest_realigned.bcftools_stats") into nearest_realigned_stats
+    path("${sampleName}.nearest_realigned.vcf")
+
+
+    script:
+    """
+    minimap2 -ax asm5 -R '@RG\\tID:${sampleName}\\tSM:${sampleName}' \
+      ${nearest_gisaid} ${assembly} |
+      samtools sort -O bam -o ${sampleName}.nearest_realigned.bam
+    samtools index ${sampleName}.nearest_realigned.bam
+    bcftools mpileup -f ${nearest_gisaid}  ${sampleName}.nearest_realigned.bam |
+      bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
+      > ${sampleName}.nearest_realigned.vcf
+    bcftools stats ${sampleName}.nearest_realigned.vcf > ${sampleName}.nearest_realigned.bcftools_stats
+    """
 }
 
 process quast {
@@ -584,6 +685,7 @@ process alignSequences {
 
     output:
     path('aligned.fasta') into (aligned_ch, refinetree_alignment, ancestralsequences_alignment)
+
 
     script:
     """
