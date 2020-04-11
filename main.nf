@@ -100,6 +100,7 @@ if (params.kraken2_db == "") {
 
 process filterReads {
     tag { sampleName }
+    label 'process_large'
 
     input:
     path(db) from kraken2_db
@@ -112,8 +113,8 @@ process filterReads {
     script:
     """
     minimap2 -ax sr ${ref_fasta} ${reads} |
-      samtools sort -n -O bam -o mapped.bam
-    samtools fastq -G 12 -1 paired1.fq.gz -2 paired2.fq.gz \
+      samtools sort -@ ${task.cpus-1} -n -O bam -o mapped.bam
+    samtools fastq -@ ${task.cpus-1} -G 12 -1 paired1.fq.gz -2 paired2.fq.gz \
        -0 /dev/null -s /dev/null -n -c 6 \
        mapped.bam
     rm mapped.bam
