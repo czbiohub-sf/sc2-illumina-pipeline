@@ -9,6 +9,7 @@ dependencies:
   - samtools=1.9
   - bcftools=1.9
   - seqtk=1.3
+  - freebayes=1.3.2
   - trim-galore=0.6.5
   - multiqc=1.8
   - quast=5.0.2
