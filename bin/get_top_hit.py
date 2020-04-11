@@ -27,8 +27,8 @@ if len(SeqIO.read(args.assembly, 'fasta')) > 0:
     df = pd.read_csv(f'{args.sampleName}.blast.tsv', sep='\t', names=['sacc', 'nident', 'pident',
                                                           'length', 'mismatch', 'gapopen', 'qstart',
                                                           'qend', 'sstart', 'send', 'evalue', 'bitscore'])
-    if df['length'].max() < args.minLength:
-        # One HSP should extend to at least the minimum length since we only expect a few SNPS
+    if df['length'].max() < args.minLength/2:
+        # One HSP should extend to at least half the minimum length since we only expect a few SNPS
         # Otherwise the alignment is probably bad
         shutil.copyfile(args.default, 'nearest_gisaid.fasta')
     else:
