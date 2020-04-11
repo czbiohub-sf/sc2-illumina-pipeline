@@ -3,3 +3,4 @@ results/
 work/
 .nextflow*
 scratch/
+*gisaid*.fasta

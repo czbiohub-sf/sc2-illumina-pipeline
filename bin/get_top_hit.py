@@ -12,8 +12,8 @@ parser.add_argument('--sequences', help='FASTA file of reference sequences')
 parser.add_argument('--default', help='reference sequence if no hits')
 args = parser.parse_args()
 
-df = pd.read_csv(args.csv, sep='\t', names=['sacc', 'nident', 'pident',
-                                                      'length', 'mismatch', 'gapopen', 'qstart'.
+df = pd.read_csv(args.tsv, sep='\t', names=['sacc', 'nident', 'pident',
+                                                      'length', 'mismatch', 'gapopen', 'qstart',
                                                       'qend', 'sstart', 'send', 'evalue', 'bitscore'])
 try:
     top_hit = df['sacc'][0]
