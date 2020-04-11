@@ -20,7 +20,10 @@ filtered_rows = []
 for _, row in stats_df.iterrows():
     if row["n_missing"] <= args.max_n and row["n_actg"] >= args.min_len:
         filtered_rows.append(row)
-filtered_rows = pd.DataFrame(filtered_rows)
+if filtered_rows:
+    filtered_rows = pd.DataFrame(filtered_rows)
+else:
+    filtered_rows = pd.DataFrame(columns=stats_df.columns)
 filtered_rows.to_csv(args.out_prefix + ".stats.tsv", sep="\t", index=False)
 
 samples_to_keep = set(filtered_rows["sample_name"])
