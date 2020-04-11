@@ -297,7 +297,7 @@ process blastConsensus {
 
     script:
     """
-    get_top_hit.py --sequences ${dbsequences} --sampleName ${sampleName} --assembly ${assembly} --default ${ref_fasta}
+    get_top_hit.py --minLength ${params.minLength} --sequences ${dbsequences} --sampleName ${sampleName} --assembly ${assembly} --default ${ref_fasta}
     """
 }
 
