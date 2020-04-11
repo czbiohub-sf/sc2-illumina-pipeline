@@ -297,9 +297,7 @@ process blastConsensus {
 
     script:
     """
-    blastn -db gisaid.nt -query ${assembly} -num_threads 32 -out ${sampleName}.blast.tsv \
-     -outfmt '6 sacc nident pident length mismatch gapopen qstart qend sstart send evalue bitscore'
-    get_top_hit.py --tsv ${sampleName}.blast.tsv --sequences ${dbsequences} --default ${ref_fasta}
+    get_top_hit.py --sequences ${dbsequences} --sampleName ${sampleName} --assembly ${assembly} --default ${ref_fasta}
     """
 }
 
