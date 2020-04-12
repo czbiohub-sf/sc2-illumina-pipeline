@@ -30,17 +30,17 @@ if len(SeqIO.read(args.assembly, 'fasta')) > 0:
     if df['length'].max() < args.minLength/2:
         # One HSP should extend to at least half the minimum length since we only expect a few SNPS
         # Otherwise the alignment is probably bad
-        shutil.copyfile(args.default, 'nearest_gisaid.fasta')
+        shutil.copyfile(args.default, 'nearest_blast.fasta')
     else:
         try:
             # In case the TSV is empty
             top_hit = df[df['bitscore']==df['bitscore'].max()]['sacc'][0]
             sequences = SeqIO.index(args.sequences, 'fasta')
             top_hit_seq = sequences[top_hit]
-            SeqIO.write(top_hit_seq, 'nearest_gisaid.fasta', 'fasta')
+            SeqIO.write(top_hit_seq, 'nearest_blast.fasta', 'fasta')
         except IndexError:
-            shutil.copyfile(args.default, 'nearest_gisaid.fasta')
+            shutil.copyfile(args.default, 'nearest_blast.fasta')
 else:
-    shutil.copyfile(args.default, 'nearest_gisaid.fasta')
+    shutil.copyfile(args.default, 'nearest_blast.fasta')
     with open(f'{args.sampleName}.blast.tsv', 'w+') as f:
         f.write('Empty query sequence.')

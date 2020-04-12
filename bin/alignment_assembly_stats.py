@@ -16,7 +16,6 @@ parser.add_argument("--sample_name")
 parser.add_argument("--cleaned_bam")
 parser.add_argument("--assembly")
 parser.add_argument("--samtools_stats")
-parser.add_argument("--vcf")
 parser.add_argument("--primervcf")
 parser.add_argument("--neighborvcf")
 parser.add_argument("--clades")
@@ -27,7 +26,7 @@ args = parser.parse_args()
 stats = {"sample_name": args.sample_name}
 neighbor_vcf = pysam.VariantFile(args.neighborvcf)
 nearest_neighbor = list(neighbor_vcf.header.contigs)[0]
-stats["nearest_reference"] = nearest_neighbor
+stats["nearest_sequence"] = nearest_neighbor
 
 samfile = pysam.AlignmentFile(args.cleaned_bam, "rb")
 ref_len, = samfile.lengths
@@ -92,9 +91,8 @@ def countVCF(vcf_file, snpcol, mnpcol, indelcol, statsdict):
                 statsdict[mnpcol] += 1
     return statsdict
 
-stats = {**stats, **countVCF(args.vcf, 'snps', 'mnps', 'indels', stats)}
 stats = {**stats, **countVCF(args.primervcf, 'primer_snps', 'primer_mnps', 'primer_indels', stats)}
-stats = {**stats, **countVCF(args.neighborvcf, 'nearest_ref_snps', 'nearest_ref_mnps', 'nearest_ref_indels', stats)}
+stats = {**stats, **countVCF(args.neighborvcf, 'new_snps', 'new_mnps', 'new_indels', stats)}
 
 stats["clade"] = []
 with open(args.clades) as f:

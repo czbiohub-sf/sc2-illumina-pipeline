@@ -22,7 +22,8 @@ for fname in sys.argv[1:]:
     for key in [
             "sample_name", "clade", "depth_avg", "mapped_reads",
             "total_reads", "n_actg", "n_missing", "n_gap",
-            "n_ambiguous", "snps", "mnps", "indels"]:
+            "n_ambiguous", "nearest_sequence",
+            "new_snps", "new_mnps", "new_indels"]:
         reordered_row[key] = row.pop(key)
     reordered_row.update(row)
     rows.append(reordered_row)
