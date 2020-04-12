@@ -16,14 +16,17 @@ parser.add_argument("--sample_name")
 parser.add_argument("--cleaned_bam")
 parser.add_argument("--assembly")
 parser.add_argument("--samtools_stats")
-parser.add_argument("--vcf")
 parser.add_argument("--primervcf")
+parser.add_argument("--neighborvcf")
 parser.add_argument("--clades")
 parser.add_argument("--out_prefix")
 parser.add_argument("--reads", nargs="+")
 args = parser.parse_args()
 
 stats = {"sample_name": args.sample_name}
+neighbor_vcf = pysam.VariantFile(args.neighborvcf)
+nearest_neighbor = list(neighbor_vcf.header.contigs)[0]
+stats["nearest_sequence"] = nearest_neighbor
 
 samfile = pysam.AlignmentFile(args.cleaned_bam, "rb")
 ref_len, = samfile.lengths
@@ -71,35 +74,25 @@ with open(args.samtools_stats) as f:
                 stats["paired_other_orientation"] = int(matched.group(2)) * 2
             # TODO: number of discordant read pairs
 
-vcf = pysam.VariantFile(args.vcf)
-stats["snps"] = 0
-stats["mnps"] = 0
-stats["indels"] = 0
-for rec in vcf.fetch():
-    allele_lens = set([len(a) for a in [rec.ref] + list(rec.alts)])
-    if len(allele_lens) > 1:
-        stats["indels"] += 1
-    else:
-        l, = allele_lens
-        if l == 1:
-            stats["snps"] += 1
+def countVCF(vcf_file, snpcol, mnpcol, indelcol, statsdict):
+    vcf = pysam.VariantFile(vcf_file)
+    statsdict[snpcol] = 0
+    statsdict[mnpcol] = 0
+    statsdict[indelcol] = 0
+    for rec in vcf.fetch():
+        allele_lens = set([len(a) for a in [rec.ref] + list(rec.alts)])
+        if len(allele_lens) > 1:
+            statsdict[indelcol] += 1
         else:
-            stats["mnps"] += 1
+            l, = allele_lens
+            if l == 1:
+                statsdict[snpcol] += 1
+            else:
+                statsdict[mnpcol] += 1
+    return statsdict
 
-primervcf = pysam.VariantFile(args.primervcf)
-stats["primer_snps"] = 0
-stats["primer_mnps"] = 0
-stats["primer_indels"] = 0
-for rec in primervcf.fetch():
-    allele_lens = set([len(a) for a in [rec.ref] + list(rec.alts)])
-    if len(allele_lens) > 1:
-        stats["primer_indels"] += 1
-    else:
-        l, = allele_lens
-        if l == 1:
-            stats["primer_snps"] += 1
-        else:
-            stats["primer_mnps"] += 1
+stats = {**stats, **countVCF(args.primervcf, 'primer_snps', 'primer_mnps', 'primer_indels', stats)}
+stats = {**stats, **countVCF(args.neighborvcf, 'new_snps', 'new_mnps', 'new_indels', stats)}
 
 stats["clade"] = []
 with open(args.clades) as f:

@@ -3,3 +3,5 @@ results/
 work/
 .nextflow*
 scratch/
+*gisaid*.fasta
+!data/test/ncov-example-data-sequences.fasta

@@ -13,10 +13,12 @@ def helpMessage() {
       --reads                       Path to reads, must be in quotes
       --primers                     Path to BED file of primers
       --ref                         Path to FASTA reference sequence
-      --gisaid_sequences            GISAID FASTA
+      --ref_gb                      Reference Genbank file for augur
+      --blast_sequences             FASTA of sequences to BLAST for nearest neighbors
+      --nextstrain_sequences        FASTA of sequences to build a tree with
 
 
-    Options:
+    Consensus calling options:
       --kraken2_db                  Path to kraken db (default: "")
       --exclude_samples             comma-separated string of samples to exclude from analysis
       --single_end [bool]           Specifies that the input is single-end reads
@@ -24,10 +26,13 @@ def helpMessage() {
       --maxNs                       Max number of Ns to allow assemblies to pass QC
       --minLength                   Minimum base pair length to allow assemblies to pass QC
       --no_reads_quast              Run QUAST without aligning reads
-      --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
-      --qpcr_primers                BED file with positions of qPCR primers to check for variants
-      --ref_gb                      Reference Genbank file for augur
       --clades                      TSV file with columns clade, gene, site, alt (augur clades format)
+      --qpcr_primers                BED file with positions of qPCR primers to check for variants
+
+
+    Nextstrain options:
+      --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
+
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -91,6 +96,7 @@ if (params.kraken2_db == "") {
 
 process filterReads {
     tag { sampleName }
+    label 'process_large'
 
     input:
     path(db) from kraken2_db
@@ -103,8 +109,8 @@ process filterReads {
     script:
     """
     minimap2 -ax sr ${ref_fasta} ${reads} |
-      samtools sort -n -O bam -o mapped.bam
-    samtools fastq -G 12 -1 paired1.fq.gz -2 paired2.fq.gz \
+      samtools sort -@ ${task.cpus-1} -n -O bam -o mapped.bam
+    samtools fastq -@ ${task.cpus-1} -G 12 -1 paired1.fq.gz -2 paired2.fq.gz \
        -0 /dev/null -s /dev/null -n -c 6 \
        mapped.bam
     rm mapped.bam
@@ -236,7 +242,7 @@ process makeConsensus {
 	tuple(sampleName, path(bam)) from consensus_bam
 
 	output:
-	tuple(sampleName, path("${sampleName}.consensus.fa")) into (consensus_fa, quast_ch)
+	tuple(sampleName, path("${sampleName}.consensus.fa")) into (consensus_fa, quast_ch, compareconsensus_ch, consensustoneighbor_ch)
 
 	script:
 	"""
@@ -246,6 +252,75 @@ process makeConsensus {
         echo '>${sampleName}' > ${sampleName}.consensus.fa
         seqtk seq -l 50 ${sampleName}.primertrimmed.consensus.fa | tail -n +2 >> ${sampleName}.consensus.fa
 	"""
+}
+
+blast_sequences = file(params.blast_sequences, checkIfExists: true)
+
+process buildBLASTDB {
+
+    input:
+    path(blast_sequences)
+
+    output:
+    path("blast_seqs.nt*") into blastdb_ch
+    path("blast_sequences.fasta") into blast_clean_ch
+
+    script:
+    """
+    normalize_gisaid_fasta.sh ${blast_sequences} blast_seqs_clean.fasta
+    sed 's/\\.//g' blast_seqs_clean.fasta > blast_sequences.fasta
+
+    makeblastdb -in blast_sequences.fasta -parse_seqids -title 'blastseqs' -dbtype nucl -out blast_seqs.nt
+    """
+}
+
+process blastConsensus {
+    tag {sampleName}
+    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
+
+    input:
+    tuple(sampleName, path(assembly)) from compareconsensus_ch
+    path(dbsequences) from blast_clean_ch
+    path(blastdb) from blastdb_ch
+    path(ref_fasta)
+
+    output:
+    path("${sampleName}.blast.tsv")
+    tuple(sampleName, path("nearest_blast.fasta")) into nearest_neighbor
+
+    script:
+    """
+    get_top_hit.py --minLength ${params.minLength} --sequences ${dbsequences} --sampleName ${sampleName} --assembly ${assembly} --default ${ref_fasta}
+    """
+}
+
+nearest_neighbor
+    .join(consensustoneighbor_ch)
+    .set{nearest_blast_ch}
+
+process nearestVariants {
+    tag {sampleName}
+    publishDir "${params.outdir}/sample-variants", mode: 'copy'
+
+    input:
+    tuple(sampleName, path(nearest_blast), path(assembly)) from nearest_blast_ch
+
+    output:
+    path("${sampleName}.nearest_realigned.bcftools_stats") into nearest_realigned_stats
+    tuple(sampleName, path("${sampleName}.nearest_realigned.vcf")) into nearest_realigned_vcf
+
+
+    script:
+    """
+    minimap2 -ax asm5 -R '@RG\\tID:${sampleName}\\tSM:${sampleName}' \
+      ${nearest_blast} ${assembly} |
+      samtools sort -O bam -o ${sampleName}.nearest_realigned.bam
+    samtools index ${sampleName}.nearest_realigned.bam
+    bcftools mpileup -f ${nearest_blast}  ${sampleName}.nearest_realigned.bam |
+      bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
+      > ${sampleName}.nearest_realigned.vcf
+    bcftools stats ${sampleName}.nearest_realigned.vcf > ${sampleName}.nearest_realigned.bcftools_stats
+    """
 }
 
 process quast {
@@ -311,7 +386,7 @@ process callVariants {
     path(ref_fasta)
 
     output:
-    tuple(sampleName, path("${sampleName}.vcf")) into (sample_variants_vcf, primer_variants_ch, assignclades_in)
+    tuple(sampleName, path("${sampleName}.vcf")) into (primer_variants_ch, assignclades_in)
     path("${sampleName}.bcftools_stats") into bcftools_stats_ch
 
     script:
@@ -374,9 +449,9 @@ process searchPrimers {
 stats_reads
     .join(stats_bam)
     .join(stats_fa)
-    .join(sample_variants_vcf)
     .join(primer_variants_vcf)
     .join(assignclades_out)
+    .join(nearest_realigned_vcf)
     .set { stats_ch_in }
 
 process computeStats {
@@ -389,9 +464,9 @@ process computeStats {
           file(reads),
           file(trimmed_filtered_bam),
           file(in_fa),
-          file(in_vcf),
           file(primer_vcf),
-          file(in_clades)) from stats_ch_in
+          file(in_clades),
+          file(neighbor_vcf)) from stats_ch_in
 
     output:
     file("${sampleName}.samtools_stats") into samtools_stats_out
@@ -407,8 +482,8 @@ process computeStats {
         --cleaned_bam ${trimmed_filtered_bam} \
         --samtools_stats ${sampleName}.samtools_stats \
         --assembly ${in_fa} \
-        --vcf ${in_vcf} \
         --primervcf ${primer_vcf} \
+        --neighborvcf ${neighbor_vcf} \
         --clades ${in_clades} \
         --out_prefix ${sampleName} \
         --reads ${reads}
@@ -520,15 +595,15 @@ process intrahostVariants {
 
 // Set up GISAID files
 
-if (params.nextstrain_ncov != "" && params.gisaid_sequences != "") {
-    gisaid_sequences_ch = Channel.from(file(params.gisaid_sequences, checkIfExists: true))
+if (params.nextstrain_ncov != "" && params.nextstrain_sequences != "") {
+    nextstrain_sequences_ch = Channel.from(file(params.nextstrain_sequences, checkIfExists: true))
 
     nextstrain_ncov = params.nextstrain_ncov
     if (nextstrain_ncov[-1] != "/") {
         nextstrain_ncov = nextstrain_ncov + "/"
     }
 
-    gisaid_metadata_path = file(nextstrain_ncov + "data/metadata.tsv", checkIfExists: true)
+    nextstrain_metadata_path = file(nextstrain_ncov + "data/metadata.tsv", checkIfExists: true)
     nextstrain_config = nextstrain_ncov + "config/"
     include_file = file(nextstrain_config + "include.txt", checkIfExists: true)
     exclude_file = file(nextstrain_config + "exclude.txt", checkIfExists: true)
@@ -536,8 +611,8 @@ if (params.nextstrain_ncov != "" && params.gisaid_sequences != "") {
     auspice_config = file(nextstrain_config + "auspice_config.json", checkIfExists: true)
     lat_longs = file(nextstrain_config + "lat_longs.tsv", checkIfExists: true)
 } else {
-    gisaid_sequences_ch = Channel.empty()
-    gisaid_metadata_path = Channel.empty()
+    nextstrain_sequences_ch = Channel.empty()
+    nextstrain_metadata_path = Channel.empty()
     nextstrain_config = Channel.empty()
     include_file = Channel.empty()
     exclude_file = Channel.empty()
@@ -552,18 +627,18 @@ process makeNextstrainInput {
 
     input:
     path(sample_sequences) from nextstrain_ch
-    path(gisaid_sequences) from gisaid_sequences_ch
-    path(gisaid_metadata_path)
+    path(nextstrain_sequences) from nextstrain_sequences_ch
+    path(nextstrain_metadata_path)
 
     output:
-    path('metadata.tsv') into (gisaid_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata, export_metadata)
+    path('metadata.tsv') into (nextstrain_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata, export_metadata)
     path('sequences.fasta') into nextstrain_sequences
 
     script:
     currdate = new java.util.Date().format('yyyy-MM-dd')
     // Normalize the GISAID names using Nextstrain's bash script
     """
-    make_nextstrain_input.py -ps ${gisaid_sequences} -pm ${gisaid_metadata_path} -ns ${sample_sequences} --date $currdate \
+    make_nextstrain_input.py -ps ${nextstrain_sequences} -pm ${nextstrain_metadata_path} -ns ${sample_sequences} --date $currdate \
     -r 'North America' -c USA -div 'California' -loc 'San Francisco County' -origlab 'Biohub' -sublab 'Biohub' \
     -subdate $currdate
 
@@ -578,7 +653,7 @@ process filterStrains {
 
     input:
     path(sequences) from nextstrain_sequences
-    path(metadata) from gisaid_metadata
+    path(metadata) from nextstrain_metadata
     path(include_file)
     path(exclude_file)
 
@@ -614,6 +689,7 @@ process alignSequences {
 
     output:
     path('aligned.fasta') into (aligned_ch, refinetree_alignment, ancestralsequences_alignment)
+
 
     script:
     """
@@ -838,6 +914,7 @@ process multiqc {
    path(multiqc_config)
    path(bcftools_stats) from bcftools_stats_ch.collect().ifEmpty([])
    path(primer_stats) from primer_stats_ch.collect().ifEmpty([])
+   path(nearest_realigned) from nearest_realigned_stats.collect().ifEmpty([])
 
    output:
    path("*multiqc_report.html")
@@ -846,6 +923,7 @@ process multiqc {
 
 	script:
 	"""
-	multiqc -f -ip --config ${multiqc_config} ${trim_galore_results}  ${samtools_stats} quast_results/ ${bcftools_stats} ${primer_stats}
+	multiqc -f -ip --config ${multiqc_config} ${trim_galore_results} \
+      ${samtools_stats} quast_results/ ${bcftools_stats} ${primer_stats} ${nearest_realigned}
 	"""
 }
