@@ -22,9 +22,14 @@ alternate = reference.seq.tomutable()
 
 for rec in vcf.fetch():
     pos = rec.pos - 1
-    assert rec.ref==reference.seq[pos], 'Reference allele does not match VCF record'
-    assert len(rec.alts)==1, 'More than one alternate allele present'
-    alternate[pos] = rec.alts[0]
+    ref_allele = rec.ref
+    # TODO: do we need to handle case with more than 1 alt?
+    alt_allele = rec.alts[0]
+    if len(ref_allele) != 1 or len(alt_allele) != 1:
+        # skip non-SNPs
+        continue
+    else:
+        alternate[pos] = alt_allele
 
 sample_aa = {}
 for cds in CDS_features:

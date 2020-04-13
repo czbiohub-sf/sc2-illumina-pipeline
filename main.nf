@@ -413,7 +413,9 @@ process assignClades {
 
     script:
     """
-    assignclades.py --reference ${ref_gb} --clades ${clades} --vcf ${vcf} --sample ${sampleName}
+    assignclades.py \
+        --reference ${ref_gb} --clades ${clades} \
+        --vcf ${vcf} --sample ${sampleName}
     """
 }
 
