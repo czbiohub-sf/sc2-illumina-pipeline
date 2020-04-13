@@ -5,3 +5,4 @@ work/
 scratch/
 *gisaid*.fasta
 !data/test/ncov-example-data-sequences.fasta
+.DS_Store
