@@ -907,25 +907,27 @@ process exportData {
 }
 
 process multiqc {
-	publishDir "${params.outdir}/MultiQC", mode: 'copy'
+    publishDir "${params.outdir}/MultiQC", mode: 'copy'
 
-   input:
-   path(trim_galore_results) from trimmed_reports.collect().ifEmpty([])
-   path("quast_results/*/*") from multiqc_quast.collect()
-   path(samtools_stats) from samtools_stats_out.collect()
-   path(multiqc_config)
-   path(bcftools_stats) from bcftools_stats_ch.collect().ifEmpty([])
-   path(primer_stats) from primer_stats_ch.collect().ifEmpty([])
-   path(nearest_realigned) from nearest_realigned_stats.collect().ifEmpty([])
+    input:
+    path(trim_galore_results) from trimmed_reports.collect().ifEmpty([])
+    path("quast_results/*/*") from multiqc_quast.collect()
+    path(samtools_stats) from samtools_stats_out.collect()
+    path(multiqc_config)
+    path(bcftools_stats) from bcftools_stats_ch.collect().ifEmpty([])
+    path(primer_stats) from primer_stats_ch.collect().ifEmpty([])
+    path(nearest_realigned) from nearest_realigned_stats.collect().ifEmpty([])
 
-   output:
-   path("*multiqc_report.html")
-   path("*_data")
-   path("multiqc_plots")
+    output:
+    path("*multiqc_report.html")
+    path("*_data")
+    path("multiqc_plots")
 
-	script:
-	"""
-	multiqc -f -ip --config ${multiqc_config} ${trim_galore_results} \
-      ${samtools_stats} quast_results/ ${bcftools_stats} ${primer_stats} ${nearest_realigned}
-	"""
+    // TODO: add trim_galore results (currently breaking for empty fastqs?)
+    script:
+    """
+    multiqc -f -ip --config ${multiqc_config} \
+        ${samtools_stats} quast_results/ ${bcftools_stats} \
+        ${primer_stats} ${nearest_realigned}
+    """
 }
