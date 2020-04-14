@@ -32,6 +32,7 @@ def helpMessage() {
 
     Nextstrain options:
       --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
+      --subsample_gisaid            Subsample GISAID for alignment
 
 
     Other options:
@@ -291,11 +292,33 @@ process blastConsensus {
 
     output:
     path("${sampleName}.blast.tsv")
-    tuple(sampleName, path("nearest_blast.fasta")) into nearest_neighbor
+    tuple(sampleName, path("${sampleName}_nearest_blast.fasta")) into nearest_neighbor, collectnearest_ch)
 
     script:
     """
     get_top_hit.py --minLength ${params.minLength} --sequences ${dbsequences} --sampleName ${sampleName} --assembly ${assembly} --default ${ref_fasta}
+    """
+}
+
+process collectNearest {
+
+    input:
+    path(fastas) from collectnearest_ch.map{it[1]}.collect()
+
+    output:
+    path("included_samples.txt") into included_samples_ch
+    path("included_samples.fasta") into included_fastas_ch
+
+    script:
+    if (params.subsample_gisaid)
+    """
+    cat ${fastas} > included_samples.fasta
+    cat ${fastas} | grep '>' | awk -F '>' '{print \$2}' > included_samples.txt
+    """
+    else
+    """
+    touch included_samples.fasta
+    touch included_samples.txt
     """
 }
 
@@ -663,13 +686,18 @@ process filterStrains {
     path(metadata) from nextstrain_metadata
     path(include_file)
     path(exclude_file)
+    path(included_samples) from included_samples_ch
+    path(included_fastas) from included_fastas_ch
 
     output:
     path('filtered.fasta') into filtered_sequences_ch
 
     script:
     String exclude_where = "date='2020' date='2020-01-XX' date='2020-02-XX' date='2020-03-XX' date='2020-04-XX' date='2020-01' date='2020-02' date='2020-03' date='2020-04'"
+    if (params.subsample_gisaid)
     """
+    cat ${included_samples} >> ${include_file}
+    cat ${include_fastas} >> ${sequences}
     augur filter \
             --sequences ${sequences} \
             --metadata ${metadata} \
@@ -678,7 +706,19 @@ process filterStrains {
             --exclude-where ${exclude_where} \
             --min-length ${params.minLength} \
             --group-by division year month \
-            --sequences-per-group 300 \
+            --sequences-per-group 1 \
+            --output filtered.fasta
+    """
+
+    else
+    """
+    augur filter \
+            --sequences ${sequences} \
+            --metadata ${metadata} \
+            --include ${include_file} \
+            --exclude ${exclude_file} \
+            --exclude-where ${exclude_where} \
+            --min-length ${params.minLength} \
             --output filtered.fasta
     """
 
