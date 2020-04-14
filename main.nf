@@ -694,7 +694,6 @@ process filterStrains {
 
     script:
     String exclude_where = "date='2020' date='2020-01-XX' date='2020-02-XX' date='2020-03-XX' date='2020-04-XX' date='2020-01' date='2020-02' date='2020-03' date='2020-04'"
-    if (params.subsample_gisaid)
     """
     cat ${included_samples} >> ${include_file}
     cat ${included_fastas} >> ${sequences}
@@ -706,23 +705,8 @@ process filterStrains {
             --exclude ${exclude_file} \
             --exclude-where ${exclude_where} \
             --min-length ${params.minLength} \
-            --group-by division year month \
-            --sequences-per-group 1 \
             --output filtered.fasta
     """
-
-    else
-    """
-    augur filter \
-            --sequences ${sequences} \
-            --metadata ${metadata} \
-            --include ${include_file} \
-            --exclude ${exclude_file} \
-            --exclude-where ${exclude_where} \
-            --min-length ${params.minLength} \
-            --output filtered.fasta
-    """
-
 }
 
 process alignSequences {
