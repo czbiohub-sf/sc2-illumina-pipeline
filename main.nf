@@ -697,7 +697,7 @@ process filterStrains {
     if (params.subsample_gisaid)
     """
     cat ${included_samples} >> ${include_file}
-    cat ${include_fastas} >> ${sequences}
+    cat ${included_fastas} >> ${sequences}
     augur filter \
             --sequences ${sequences} \
             --metadata ${metadata} \
