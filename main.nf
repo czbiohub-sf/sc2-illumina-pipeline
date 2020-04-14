@@ -178,9 +178,14 @@ process trimReads {
     if [ "\$LINES" -gt 0 ];
     then
         trim_galore --fastqc --paired ${reads}
+        TRIMMED=\$(zcat ${sampleName}_covid_1_val_1.fq.gz | wc -l)
+        if [ "\$TRIMMED" == 0 ];
+        then
+            rm -r *fastqc.zip
+        fi
     else
-        cp ${reads[0]} ${sampleName}_1_val_1.fq.gz
-        cp ${reads[1]} ${sampleName}_2_val_2.fq.gz
+        cp ${reads[0]} ${sampleName}_covid_1_val_1.fq.gz
+        cp ${reads[1]} ${sampleName}_covid_2_val_2.fq.gz
     fi
     """
 }
@@ -928,6 +933,6 @@ process multiqc {
     """
     multiqc -f -ip --config ${multiqc_config} \
         ${samtools_stats} quast_results/ ${bcftools_stats} \
-        ${primer_stats} ${nearest_realigned}
+        ${primer_stats} ${nearest_realigned} ${trim_galore_results}
     """
 }
