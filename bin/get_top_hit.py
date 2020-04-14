@@ -17,7 +17,7 @@ args = parser.parse_args()
 
 # check that the query is not empty
 if len(SeqIO.read(args.assembly, 'fasta')) > 0:
-    subprocess.run(" ".join(["blastn", "-db", "gisaid.nt", "-query",
+    subprocess.run(" ".join(["blastn", "-db", "blast_seqs.nt", "-query",
                     args.assembly, "-num_threads", "32", "-out",
                     f"{args.sampleName}.blast.tsv", "-outfmt", "'6",
                     "sacc", "nident", "pident", "length", "mismatch",
