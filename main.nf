@@ -698,8 +698,9 @@ process filterStrains {
     """
     cat ${included_samples} >> ${include_file}
     cat ${included_fastas} >> ${sequences}
+    seqkit rmdup ${sequences} > deduped_sequences.fasta
     augur filter \
-            --sequences ${sequences} \
+            --sequences deduped_sequences.fasta \
             --metadata ${metadata} \
             --include ${include_file} \
             --exclude ${exclude_file} \
