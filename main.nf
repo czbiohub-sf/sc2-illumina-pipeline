@@ -292,7 +292,7 @@ process blastConsensus {
 
     output:
     path("${sampleName}.blast.tsv")
-    tuple(sampleName, path("${sampleName}_nearest_blast.fasta")) into nearest_neighbor, collectnearest_ch)
+    tuple(sampleName, path("${sampleName}_nearest_blast.fasta")) into (nearest_neighbor, collectnearest_ch)
 
     script:
     """
