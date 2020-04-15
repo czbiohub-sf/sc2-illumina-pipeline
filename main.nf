@@ -198,8 +198,7 @@ reads_ch.into { minimap2_reads_in; quast_reads }
 
 process alignReads {
     tag { sampleName }
-
-    cpus 4
+    label 'process_medium'
 
     input:
     tuple(sampleName, file(reads)) from minimap2_reads_in
@@ -211,7 +210,7 @@ process alignReads {
     script:
     """
     minimap2 -ax sr -R '@RG\\tID:${sampleName}\\tSM:${sampleName}' ${ref_fasta} ${reads} |
-      samtools sort -@ 2 -O bam -o ${sampleName}.bam
+      samtools sort -@ ${task.cpus-1} -O bam -o ${sampleName}.bam
     """
 }
 
