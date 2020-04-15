@@ -32,8 +32,7 @@ def helpMessage() {
 
     Nextstrain options:
       --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
-      --subsample_gisaid            Subsample GISAID for alignment
-
+      --subsample  N                Subsample nextstrain sequences to N (default: 100)
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -310,15 +309,9 @@ process collectNearest {
     path("included_samples.fasta") into included_fastas_ch
 
     script:
-    if (params.subsample_gisaid)
     """
     cat ${fastas} > included_samples.fasta
     cat ${fastas} | grep '>' | awk -F '>' '{print \$2}' > included_samples.txt
-    """
-    else
-    """
-    touch included_samples.fasta
-    touch included_samples.txt
     """
 }
 
@@ -651,13 +644,33 @@ if (params.nextstrain_ncov != "" && params.nextstrain_sequences != "") {
     lat_longs = Channel.empty()
 }
 
+process prepareSequences {
+
+    input:
+    path(nextstrain_sequences) from nextstrain_sequences_ch
+
+    output:
+    path('subsampled_sequences.fasta') into nextstrain_subsampled_ch
+
+    script:
+    if (params.subsample)
+    """
+    seqtk sample -s 11 ${nextstrain_sequences} ${params.subsample} > subsampled_sequences.fasta
+    seqkit faidx -r ${nextstrain_sequences} '.+Wuhan-Hu-1/2019.+' >> subsampled_sequences.fasta
+    """
+    else
+    """
+    cp ${nextstrain_sequences} subsampled_sequences.fasta
+    """
+}
+
 process makeNextstrainInput {
     publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
     stageInMode 'copy'
 
     input:
     path(sample_sequences) from nextstrain_ch
-    path(nextstrain_sequences) from nextstrain_sequences_ch
+    path(nextstrain_sequences) from nextstrain_subsampled_ch
     path(nextstrain_metadata_path)
     path(included_samples) from included_samples_ch
     path(included_fastas) from included_fastas_ch
