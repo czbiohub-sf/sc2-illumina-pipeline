@@ -32,7 +32,7 @@ def helpMessage() {
 
     Nextstrain options:
       --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
-      --subsample  N                Subsample nextstrain sequences to N (default: 100)
+      --subsample  N                Subsample nextstrain sequences to N (set to false if no subsampling, default: 100)
 
     Other options:
       --outdir                      The output directory where the results will be saved
