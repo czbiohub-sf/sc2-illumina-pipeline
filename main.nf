@@ -33,6 +33,7 @@ def helpMessage() {
     Nextstrain options:
       --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
       --subsample  N                Subsample nextstrain sequences to N (set to false if no subsampling, default: 100)
+      --keep_polytomies             Keep polytomies in augur refine step
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -785,6 +786,28 @@ process refineTree {
     path('branch_lengths.json') into export_branch_lengths
 
     script:
+    if (params.keep_polytomies)
+    """
+    augur refine \
+        --tree ${tree} \
+        --alignment ${alignment} \
+        --metadata ${metadata} \
+        --output-tree tree.nwk \
+        --output-node-data branch_lengths.json \
+        --root 'Wuhan-Hu-1/2019' \
+        --timetree \
+        --clock-rate 0.0008 \
+        --clock-std-dev 0.0004 \
+        --coalescent skyline \
+        --date-inference marginal \
+        --divergence-unit mutations \
+        --date-confidence \
+        --no-covariance \
+        --clock-filter-iqd 4
+        --keep-polytomies
+    """
+
+    else
     """
     augur refine \
         --tree ${tree} \
