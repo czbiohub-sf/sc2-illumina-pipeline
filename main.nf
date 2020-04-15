@@ -659,10 +659,14 @@ process makeNextstrainInput {
     path(sample_sequences) from nextstrain_ch
     path(nextstrain_sequences) from nextstrain_sequences_ch
     path(nextstrain_metadata_path)
+    path(included_samples) from included_samples_ch
+    path(included_fastas) from included_fastas_ch
+    path(include_file)
 
     output:
     path('metadata.tsv') into (nextstrain_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata, export_metadata)
-    path('sequences.fasta') into nextstrain_sequences
+    path('deduped_sequences.fasta') into nextstrain_sequences
+    path('included_sequences.txt') into nextstrain_include
 
     script:
     currdate = new java.util.Date().format('yyyy-MM-dd')
@@ -673,6 +677,9 @@ process makeNextstrainInput {
     -subdate $currdate
 
     normalize_gisaid_fasta.sh all_sequences.fasta sequences.fasta
+    cat ${included_samples} ${include_file} > included_sequences.txt
+    cat ${included_fastas} >> sequences.fasta
+    seqkit rmdup sequences.fasta > deduped_sequences.fasta
     """
 
 }
@@ -684,10 +691,8 @@ process filterStrains {
     input:
     path(sequences) from nextstrain_sequences
     path(metadata) from nextstrain_metadata
-    path(include_file)
+    path(include_file) from nextstrain_include
     path(exclude_file)
-    path(included_samples) from included_samples_ch
-    path(included_fastas) from included_fastas_ch
 
     output:
     path('filtered.fasta') into filtered_sequences_ch
@@ -695,11 +700,8 @@ process filterStrains {
     script:
     String exclude_where = "date='2020' date='2020-01-XX' date='2020-02-XX' date='2020-03-XX' date='2020-04-XX' date='2020-01' date='2020-02' date='2020-03' date='2020-04'"
     """
-    cat ${included_samples} >> ${include_file}
-    cat ${included_fastas} >> ${sequences}
-    seqkit rmdup ${sequences} > deduped_sequences.fasta
     augur filter \
-            --sequences deduped_sequences.fasta \
+            --sequences ${sequences} \
             --metadata ${metadata} \
             --include ${include_file} \
             --exclude ${exclude_file} \
