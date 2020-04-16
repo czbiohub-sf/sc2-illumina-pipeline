@@ -33,6 +33,7 @@ def helpMessage() {
     Nextstrain options:
       --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
       --subsample  N                Subsample nextstrain sequences to N (set to false if no subsampling, default: 100)
+      --sample_dates                Custom sample collection dates if available, otherwise uses current date (TSV, columns should be 'strain' and 'date')
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -683,6 +684,18 @@ process makeNextstrainInput {
     script:
     currdate = new java.util.Date().format('yyyy-MM-dd')
     // Normalize the GISAID names using Nextstrain's bash script
+    if (params.sample_dates)
+    """
+    make_nextstrain_input.py -ps ${nextstrain_sequences} -pm ${nextstrain_metadata_path} -ns ${sample_sequences} --date $currdate \
+    -r 'North America' -c USA -div 'California' -loc 'San Francisco County' -origlab 'Biohub' -sublab 'Biohub' \
+    -subdate $currdate --date_tsv ${params.sample_dates}
+
+    normalize_gisaid_fasta.sh all_sequences.fasta sequences.fasta
+    cat ${included_samples} ${include_file} > included_sequences.txt
+    cat ${included_fastas} >> sequences.fasta
+    seqkit rmdup sequences.fasta > deduped_sequences.fasta
+    """
+    else
     """
     make_nextstrain_input.py -ps ${nextstrain_sequences} -pm ${nextstrain_metadata_path} -ns ${sample_sequences} --date $currdate \
     -r 'North America' -c USA -div 'California' -loc 'San Francisco County' -origlab 'Biohub' -sublab 'Biohub' \
