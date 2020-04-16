@@ -846,7 +846,7 @@ process ancestralSequences {
         --alignment ${alignment} \
         --output-node-data nt_muts.json \
         --inference joint \
-        --infer-ambiguous
+        --infer-ambiguous \
     """
 }
 
