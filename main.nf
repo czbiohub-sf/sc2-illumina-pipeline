@@ -667,7 +667,7 @@ process prepareSequences {
 sample_dates = params.sample_dates ? file(params.sample_dates, checkIfExists: true) : Channel.empty()
 
 if (params.sample_dates){
-    process makeNextstrainInput {
+    process makeDatedNextstrainInput {
         publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
         stageInMode 'copy'
 
