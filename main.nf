@@ -664,49 +664,74 @@ process prepareSequences {
     """
 }
 
-process makeNextstrainInput {
-    publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
-    stageInMode 'copy'
+sample_dates = params.sample_dates ? file(params.sample_dates, checkIfExists: true) : Channel.empty()
 
-    input:
-    path(sample_sequences) from nextstrain_ch
-    path(nextstrain_sequences) from nextstrain_subsampled_ch
-    path(nextstrain_metadata_path)
-    path(included_samples) from included_samples_ch
-    path(included_fastas) from included_fastas_ch
-    path(include_file)
+if (params.sample_dates){
+    process makeNextstrainInput {
+        publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
+        stageInMode 'copy'
 
-    output:
-    path('metadata.tsv') into (nextstrain_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata, export_metadata)
-    path('deduped_sequences.fasta') into nextstrain_sequences
-    path('included_sequences.txt') into nextstrain_include
+        input:
+        path(sample_sequences) from nextstrain_ch
+        path(nextstrain_sequences) from nextstrain_subsampled_ch
+        path(nextstrain_metadata_path)
+        path(included_samples) from included_samples_ch
+        path(included_fastas) from included_fastas_ch
+        path(include_file)
+        path(sample_dates)
 
-    script:
-    currdate = new java.util.Date().format('yyyy-MM-dd')
-    // Normalize the GISAID names using Nextstrain's bash script
-    if (params.sample_dates)
-    """
-    make_nextstrain_input.py -ps ${nextstrain_sequences} -pm ${nextstrain_metadata_path} -ns ${sample_sequences} --date $currdate \
-    -r 'North America' -c USA -div 'California' -loc 'San Francisco County' -origlab 'Biohub' -sublab 'Biohub' \
-    -subdate $currdate --date_tsv ${params.sample_dates}
+        output:
+        path('metadata.tsv') into (nextstrain_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata, export_metadata)
+        path('deduped_sequences.fasta') into nextstrain_sequences
+        path('included_sequences.txt') into nextstrain_include
 
-    normalize_gisaid_fasta.sh all_sequences.fasta sequences.fasta
-    cat ${included_samples} ${include_file} > included_sequences.txt
-    cat ${included_fastas} >> sequences.fasta
-    seqkit rmdup sequences.fasta > deduped_sequences.fasta
-    """
-    else
-    """
-    make_nextstrain_input.py -ps ${nextstrain_sequences} -pm ${nextstrain_metadata_path} -ns ${sample_sequences} --date $currdate \
-    -r 'North America' -c USA -div 'California' -loc 'San Francisco County' -origlab 'Biohub' -sublab 'Biohub' \
-    -subdate $currdate
+        script:
+        currdate = new java.util.Date().format('yyyy-MM-dd')
+        // Normalize the GISAID names using Nextstrain's bash script
+        """
+        make_nextstrain_input.py -ps ${nextstrain_sequences} -pm ${nextstrain_metadata_path} -ns ${sample_sequences} --date $currdate \
+        -r 'North America' -c USA -div 'California' -loc 'San Francisco County' -origlab 'Biohub' -sublab 'Biohub' \
+        -subdate $currdate --date_tsv ${sample_dates}
 
-    normalize_gisaid_fasta.sh all_sequences.fasta sequences.fasta
-    cat ${included_samples} ${include_file} > included_sequences.txt
-    cat ${included_fastas} >> sequences.fasta
-    seqkit rmdup sequences.fasta > deduped_sequences.fasta
-    """
+        normalize_gisaid_fasta.sh all_sequences.fasta sequences.fasta
+        cat ${included_samples} ${include_file} > included_sequences.txt
+        cat ${included_fastas} >> sequences.fasta
+        seqkit rmdup sequences.fasta > deduped_sequences.fasta
+        """
+    }
+} else {
+    process makeNextstrainInput {
+        publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
+        stageInMode 'copy'
 
+        input:
+        path(sample_sequences) from nextstrain_ch
+        path(nextstrain_sequences) from nextstrain_subsampled_ch
+        path(nextstrain_metadata_path)
+        path(included_samples) from included_samples_ch
+        path(included_fastas) from included_fastas_ch
+        path(include_file)
+
+        output:
+        path('metadata.tsv') into (nextstrain_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata, export_metadata)
+        path('deduped_sequences.fasta') into nextstrain_sequences
+        path('included_sequences.txt') into nextstrain_include
+
+        script:
+        currdate = new java.util.Date().format('yyyy-MM-dd')
+        // Normalize the GISAID names using Nextstrain's bash script
+        """
+        make_nextstrain_input.py -ps ${nextstrain_sequences} -pm ${nextstrain_metadata_path} -ns ${sample_sequences} --date $currdate \
+        -r 'North America' -c USA -div 'California' -loc 'San Francisco County' -origlab 'Biohub' -sublab 'Biohub' \
+        -subdate $currdate
+
+        normalize_gisaid_fasta.sh all_sequences.fasta sequences.fasta
+        cat ${included_samples} ${include_file} > included_sequences.txt
+        cat ${included_fastas} >> sequences.fasta
+        seqkit rmdup sequences.fasta > deduped_sequences.fasta
+        """
+
+    }
 }
 
 process filterStrains {
