@@ -299,6 +299,7 @@ process blastConsensus {
 }
 
 process collectNearest {
+    publishDir "${params.outdir}/BLAST", mode: 'copy'
 
     input:
     path(fastas) from collectnearest_ch.map{it[1]}.collect()
