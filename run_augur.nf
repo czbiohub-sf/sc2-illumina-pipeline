@@ -8,6 +8,7 @@ def helpMessage() {
       -profile                      Configuration profile to use. Can use multiple (comma separated)
                                     Available: conda, docker, singularity, awsbatch, test and more.
       --sequences                   FASTA file of consensus sequences from main output
+      --include_sequences           FASTA file of closest sequences from main output
       --metadata                    TSV of metadata from main output
       --ref_gb                      Reference Genbank file for augur
       --nextstrain_sequences        FASTA of sequences to build a tree with
@@ -63,21 +64,25 @@ process prepareSequences {
     script:
     if (params.subsample)
     """
-    seqtk sample -s 11 ${nextstrain_sequences} ${params.subsample} > subsampled_sequences.fasta
-    seqkit faidx -r ${nextstrain_sequences} '.+Wuhan-Hu-1/2019.+' >> subsampled_sequences.fasta
+    normalize_gisaid_fasta.sh ${nextstrain_sequences} cleaned_sequences.fasta
+    seqtk sample -s 11 cleaned_sequences.fasta ${params.subsample} > subsampled_sequences.fasta
+    seqkit faidx -r cleaned_sequences.fasta '.+Wuhan-Hu-1/2019.+' >> subsampled_sequences.fasta
     """
     else
     """
-    cp ${nextstrain_sequences} subsampled_sequences.fasta
+    normalize_gisaid_fasta.sh ${nextstrain_sequences} subsampled_sequences.fasta
     """
 }
+
+sample_sequences  = file(params.sequences, checkIfExists: true)
+included_fastas = file(params.include_sequences, checkIfExists: true)
 
 process makeNextstrainInput {
     publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
     stageInMode 'copy'
 
     input:
-    path(sample_sequences) from nextstrain_ch
+    path(sample_sequences)
     path(nextstrain_sequences) from nextstrain_subsampled_ch
     path(nextstrain_metadata_path)
     path(included_samples) from included_samples_ch
@@ -97,8 +102,10 @@ process makeNextstrainInput {
     -r 'North America' -c USA -div 'California' -loc 'San Francisco County' -origlab 'Biohub' -sublab 'Biohub' \
     -subdate $currdate
 
+    cat ${included_fastas} | grep '>' | awk -F '>' '{print \$2}' > included_samples.txt
+    
     normalize_gisaid_fasta.sh all_sequences.fasta sequences.fasta
-    cat ${included_samples} ${include_file} > included_sequences.txt
+    cat included_samples.txt ${include_file} > included_sequences.txt
     cat ${included_fastas} >> sequences.fasta
     seqkit rmdup sequences.fasta > deduped_sequences.fasta
     """
@@ -120,6 +127,7 @@ process filterStrains {
 
     script:
     String exclude_where = "date='2020' date='2020-01-XX' date='2020-02-XX' date='2020-03-XX' date='2020-04-XX' date='2020-01' date='2020-02' date='2020-03' date='2020-04'"
+    if (params.subsample)
     """
     augur filter \
             --sequences ${sequences} \
@@ -129,6 +137,19 @@ process filterStrains {
             --exclude-where ${exclude_where} \
             --min-length ${params.minLength} \
             --output filtered.fasta
+    """
+    else
+    """
+    augur filter \
+            --sequences ${sequences} \
+            --metadata ${metadata} \
+            --include ${include_file} \
+            --exclude ${exclude_file} \
+            --exclude-where ${exclude_where} \
+            --group-by division year month \
+            --sequences-per-group 20 \
+            --min-length ${params.minLength} \
+            --output filtered.fasta \
     """
 }
 
