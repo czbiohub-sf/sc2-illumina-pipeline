@@ -7,9 +7,9 @@ def helpMessage() {
     Mandatory arguments:
       -profile                      Configuration profile to use. Can use multiple (comma separated)
                                     Available: conda, docker, singularity, awsbatch, test and more.
-      --sequences                   FASTA file of consensus sequences from main output
+      --sample_sequences                   FASTA file of consensus sequences from main output
       --include_sequences           FASTA file of closest sequences from main output
-      --metadata                    TSV of metadata from main output
+      --sample_metadata                    TSV of metadata from main output
       --ref_gb                      Reference Genbank file for augur
       --nextstrain_sequences        FASTA of sequences to build a tree with
       --minLength                   Minimum base pair length to allow assemblies to pass QC
@@ -54,10 +54,10 @@ auspice_config = file(nextstrain_config + "auspice_config.json", checkIfExists: 
 lat_longs = file(nextstrain_config + "lat_longs.tsv", checkIfExists: true)
 
 
-sample_sequences  = file(params.sequences, checkIfExists: true)
+sample_sequences  = file(params.sample_sequences, checkIfExists: true)
 included_contextual_fastas = file(params.include_sequences, checkIfExists: true)
 
-sample_metadata = params.metadata ? file(params.metadata, checkIfExists: true) : Channel.empty()
+sample_metadata = params.sample_metadata ? file(params.metadata, checkIfExists: true) : Channel.empty()
 
 if (params.metadata) {
   process combineNextstrainInputs {
@@ -84,7 +84,7 @@ if (params.metadata) {
       normalize_gisaid_fasta.sh ${nextstrain_sequences} normalized_sequences.fasta
       cat ${included_contextual_fastas} | grep '>' | awk -F '>' '{print \$2}' > included_nearest.txt
       cat included_nearest.txt ${include_file} > included_sequences.txt
-      cat ${included_fastas} >> sequences.fasta
+      cat ${included_contextual_fastas} >> sequences.fasta
       cat sequences.fasta | grep '>' | awk -F '>' '{print \$2}' > external_samples.txt
       cat ${sample_sequences} | grep '>' | awk -F '>' '{print \$2}' > internal_samples.txt
 
