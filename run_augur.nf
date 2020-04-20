@@ -87,7 +87,7 @@ if (params.sample_metadata) {
       cat ${included_contextual_fastas} >> database_sequences.fasta
       cat database_sequences.fasta | grep '>' | awk -F '>' '{print \$2}' > external_samples.txt
       cat ${sample_sequences} | grep '>' | awk -F '>' '{print \$2}' > internal_samples.txt
-      seqkit rmdup database_sequences.fasta sequences.fasta
+      seqkit rmdup database_sequences.fasta > sequences.fasta
 
       make_nextstrain_input.py --prev_metadata ${nextstrain_metadata_path} \
           --prev_sequences sequences.fasta \
