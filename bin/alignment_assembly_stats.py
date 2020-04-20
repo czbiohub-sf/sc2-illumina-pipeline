@@ -24,9 +24,10 @@ parser.add_argument("--reads", nargs="+")
 args = parser.parse_args()
 
 stats = {"sample_name": args.sample_name}
-neighbor_vcf = pysam.VariantFile(args.neighborvcf)
-nearest_neighbor = list(neighbor_vcf.header.contigs)[0]
-stats["nearest_sequence"] = nearest_neighbor
+if args.neighborvcf:
+    neighbor_vcf = pysam.VariantFile(args.neighborvcf)
+    nearest_neighbor = list(neighbor_vcf.header.contigs)[0]
+    stats["nearest_sequence"] = nearest_neighbor
 
 samfile = pysam.AlignmentFile(args.cleaned_bam, "rb")
 ref_len, = samfile.lengths
@@ -91,8 +92,10 @@ def countVCF(vcf_file, snpcol, mnpcol, indelcol, statsdict):
                 statsdict[mnpcol] += 1
     return statsdict
 
-stats = {**stats, **countVCF(args.primervcf, 'primer_snps', 'primer_mnps', 'primer_indels', stats)}
-stats = {**stats, **countVCF(args.neighborvcf, 'new_snps', 'new_mnps', 'new_indels', stats)}
+if args.primervcf:
+    stats = {**stats, **countVCF(args.primervcf, 'primer_snps', 'primer_mnps', 'primer_indels', stats)}
+if args.neighborvcf:
+    stats = {**stats, **countVCF(args.neighborvcf, 'new_snps', 'new_mnps', 'new_indels', stats)}
 
 stats["clade"] = []
 with open(args.clades) as f:
