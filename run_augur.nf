@@ -122,7 +122,7 @@ else {
       normalize_gisaid_fasta.sh ${nextstrain_sequences} normalized_sequences.fasta
       cat ${included_contextual_fastas} | grep '>' | awk -F '>' '{print \$2}' > included_nearest.txt
       cat included_nearest.txt ${include_file} > included_sequences.txt
-      cat ${included_fastas} >> sequences.fasta
+      cat ${included_contextul_fastas} >> sequences.fasta
       cat sequences.fasta | grep '>' | awk -F '>' '{print \$2}' > external_samples.txt
       cat ${sample_sequences} | grep '>' | awk -F '>' '{print \$2}' > internal_samples.txt
 
