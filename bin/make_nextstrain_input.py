@@ -10,6 +10,7 @@ parser.add_argument('--prev_metadata', '-pm', help='Previous metadata to include
 parser.add_argument('--prev_sequences', '-ps', help='Previous sequences to include')
 parser.add_argument('--new_sequences', '-ns', help='New sample sequences to include')
 parser.add_argument('--date', '-d', help='Date for the samples (e.g. 2020-03-03)')
+parser.add_argument('--date_tsv', help='TSV with per sample dates')
 parser.add_argument('--region', '-r', help='Region for the samples (e.g. North America)')
 parser.add_argument('--country', '-c', help='Country for the samples (e.g. USA)')
 parser.add_argument('--division', '-div', help='Division for the samples (e.g. California)')
@@ -34,7 +35,6 @@ new_metadata['strain'] = strains
 new_metadata['virus'] = ['ncov']*num_strains
 new_metadata['gisaid_epi_isl'] = unknown_col
 new_metadata['genbank_accession'] = unknown_col
-new_metadata['date'] = [args.date]*num_strains
 new_metadata['region'] = [args.region]*num_strains
 new_metadata['country'] = [args.country]*num_strains
 new_metadata['division'] = [args.division]*num_strains
@@ -52,8 +52,13 @@ new_metadata['authors'] = unknown_col
 new_metadata['url'] = unknown_col
 new_metadata['title'] = unknown_col
 new_metadata['date_submitted'] = [args.date_submitted]*num_strains
-
-df = pd.concat([old_metadata, new_metadata])
+if args.date_tsv:
+    date_df = pd.read_csv(args.date_tsv, sep='\t')
+    new_metadata = new_metadata.merge(date_df, how='left', on='strain')
+    new_metadata = new_metadata.fillna({'date': args.date})
+else:
+    new_metadata['date'] = [args.date]*num_strains
+df = pd.concat([old_metadata, new_metadata], sort=False)
 df.to_csv('metadata.tsv', sep='\t', index=False)
 
 # Build the new sequences.fasta
