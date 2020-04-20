@@ -85,7 +85,7 @@ if (params.sample_metadata) {
       cat ${included_contextual_fastas} | grep '>' | awk -F '>' '{print \$2}' > included_nearest.txt
       cat included_nearest.txt ${include_file} > included_sequences.txt
       cat ${included_contextual_fastas} >> database_sequences.fasta
-      cat sequences.fasta | grep '>' | awk -F '>' '{print \$2}' > external_samples.txt
+      cat database_sequences.fasta | grep '>' | awk -F '>' '{print \$2}' > external_samples.txt
       cat ${sample_sequences} | grep '>' | awk -F '>' '{print \$2}' > internal_samples.txt
       seqkit rmdup database_sequences.fasta sequences.fasta
 
@@ -124,7 +124,7 @@ else {
       cat ${included_contextual_fastas} | grep '>' | awk -F '>' '{print \$2}' > included_nearest.txt
       cat included_nearest.txt ${include_file} > included_sequences.txt
       cat ${included_contextul_fastas} >> database_sequences.fasta
-      cat sequences.fasta | grep '>' | awk -F '>' '{print \$2}' > external_samples.txt
+      cat database_sequences.fasta | grep '>' | awk -F '>' '{print \$2}' > external_samples.txt
       cat ${sample_sequences} | grep '>' | awk -F '>' '{print \$2}' > internal_samples.txt
       seqkit rmdup database_sequences.fasta > sequences.fasta
 
