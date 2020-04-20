@@ -69,7 +69,7 @@ process makeNextstrainInput {
 
     output:
     path('metadata.tsv') into (nextstrain_metadata, firstfilter_metadata, extractsamples_metadata, priorities_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata, export_metadata)
-    path('deduped_sequences.fasta') into (nextstrain_sequences, firstfilter_in)
+    path('deduped_sequences.fasta') into (nextstrain_in, firstfilter_in)
     path('included_sequences.txt') into nextstrain_include
     path("internal_samples.txt") into sample_ids
     path("external_samples.txt") into external_ids
@@ -194,7 +194,7 @@ process filterStrains {
     publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
     input:
-    path(sequences) from nextstrain_sequences
+    path(sequences) from nextstrain_in
     path(metadata) from nextstrain_metadata
     path(include_file) from nextstrain_include
     path(exclude_file)
