@@ -16,6 +16,7 @@ def helpMessage() {
 
     Nextstrain options:
       --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
+      --sequences_per_group         Initial subsampling (default: 500)
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -120,7 +121,7 @@ process firstFilter {
             --exclude-where ${exclude_where}\
             --min-length ${params.minLength} \
             --group-by division year month \
-            --sequences-per-group 500 \
+            --sequences-per-group ${params.sequences_per_group} \
             --output filtered_sequences.fasta
   """
 }
