@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """
 Mask initial bases from alignment FASTA
 """
