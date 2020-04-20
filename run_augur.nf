@@ -84,9 +84,10 @@ if (params.sample_metadata) {
       normalize_gisaid_fasta.sh ${nextstrain_sequences} normalized_sequences.fasta
       cat ${included_contextual_fastas} | grep '>' | awk -F '>' '{print \$2}' > included_nearest.txt
       cat included_nearest.txt ${include_file} > included_sequences.txt
-      cat ${included_contextual_fastas} >> sequences.fasta
+      cat ${included_contextual_fastas} >> database_sequences.fasta
       cat sequences.fasta | grep '>' | awk -F '>' '{print \$2}' > external_samples.txt
       cat ${sample_sequences} | grep '>' | awk -F '>' '{print \$2}' > internal_samples.txt
+      seqkit rmdup database_sequences.fasta sequences.fasta
 
       make_nextstrain_input.py --prev_metadata ${nextstrain_metadata_path} \
           --prev_sequences sequences.fasta \
@@ -122,11 +123,12 @@ else {
       normalize_gisaid_fasta.sh ${nextstrain_sequences} normalized_sequences.fasta
       cat ${included_contextual_fastas} | grep '>' | awk -F '>' '{print \$2}' > included_nearest.txt
       cat included_nearest.txt ${include_file} > included_sequences.txt
-      cat ${included_contextul_fastas} >> sequences.fasta
+      cat ${included_contextul_fastas} >> database_sequences.fasta
       cat sequences.fasta | grep '>' | awk -F '>' '{print \$2}' > external_samples.txt
       cat ${sample_sequences} | grep '>' | awk -F '>' '{print \$2}' > internal_samples.txt
+      seqkit rmdup database_sequences.fasta > sequences.fasta
 
-      make_nextstrain_input.py --prev_sequences ${nextstrain_sequences} \
+      make_nextstrain_input.py --prev_sequences sequences.fasta \
           --prev_metadata ${nextstrain_metadata_path} \
           --new_sequences ${sample_sequences} \
           --date $currdate \
