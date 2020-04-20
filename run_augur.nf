@@ -113,7 +113,7 @@ else {
 
       output:
       path('metadata.tsv') into (nextstrain_metadata, firstfilter_metadata, extractsamples_metadata, priorities_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata, export_metadata)
-      path('deduped_sequences.fasta') into (nextstrain_in, firstfilter_in)
+      path('deduped_sequences.fasta') into firstfilter_in
       path('included_sequences.txt') into nextstrain_include
       path("internal_samples.txt") into sample_ids
       path("external_samples.txt") into external_ids
@@ -149,6 +149,7 @@ else {
 
 process firstFilter {
   label "nextstrain"
+  publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
   input:
   path(sequences) from firstfilter_in
@@ -178,6 +179,8 @@ process firstFilter {
 process firstAlignment{
   label "process_large"
   label "nextstrain"
+  publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
+
 
   input:
   path(sequences) from firstfiltered_ch
@@ -201,6 +204,8 @@ process firstAlignment{
 
 process extractSampleSequences {
   label 'nextstrain'
+  publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
+
 
   input:
   path(sequences) from firstaligned_ch
@@ -209,7 +214,7 @@ process extractSampleSequences {
   path(exclude) from external_ids
 
   output:
-  path("aligned_samples.fasta") into aligned_samples_ch
+  path("aligned_samples.fasta") into (aligned_samples_ch, filterstrains_in)
 
   script:
   """
@@ -223,6 +228,7 @@ process extractSampleSequences {
 }
 
 process makePriorities {
+  publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
   input:
   path(sample_sequences) from aligned_samples_ch
@@ -246,7 +252,7 @@ process filterStrains {
     publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
     input:
-    path(sequences) from nextstrain_in
+    path(sequences) from filterstrains_in
     path(metadata) from nextstrain_metadata
     path(include_file) from nextstrain_include
     path(exclude_file)
