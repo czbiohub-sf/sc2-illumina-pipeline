@@ -103,6 +103,8 @@ process firstFilter {
   input:
   path(sequences) from firstfilter_in
   path(metadata) from firstfilter_metadata
+  path(exclude_file)
+  path(include_file)
 
   output:
   path("filtered_sequences.fasta") into firstfiltered_ch
@@ -112,7 +114,7 @@ process firstFilter {
   """
   augur filter \
             --sequences ${sequences} \
-            --metadata ${nextstrain_metadata_path} \
+            --metadata ${metadata} \
             --include ${include_file} \
             --exclude ${exclude_file} \
             --exclude-where ${exclude_where}\
