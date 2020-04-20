@@ -187,7 +187,7 @@ process firstAlignment{
   path(ref_gb)
 
   output:
-  path("aligned_sequences.fasta") into (firstaligned_ch, makepriorities_ch)
+  path("aligned_sequences.fasta") into (firstaligned_ch, makepriorities_ch, filterstrains_in)
 
   script:
   """
@@ -214,7 +214,7 @@ process extractSampleSequences {
   path(exclude) from external_ids
 
   output:
-  path("aligned_samples.fasta") into (aligned_samples_ch, filterstrains_in)
+  path("aligned_samples.fasta") into aligned_samples_ch
 
   script:
   """
