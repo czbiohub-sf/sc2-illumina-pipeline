@@ -52,6 +52,9 @@ new_metadata['authors'] = unknown_col
 new_metadata['url'] = unknown_col
 new_metadata['title'] = unknown_col
 new_metadata['date_submitted'] = [args.date_submitted]*num_strains
+
+df = pd.concat([old_metadata, new_metadata])
+new_metadata.to_csv('internal_samples_metadata.tsv', sep='\t', index=False)
 if args.date_tsv:
     date_df = pd.read_csv(args.date_tsv, sep='\t')
     new_metadata = new_metadata.merge(date_df, how='left', on='strain')
@@ -59,6 +62,7 @@ if args.date_tsv:
 else:
     new_metadata['date'] = [args.date]*num_strains
 df = pd.concat([old_metadata, new_metadata], sort=False)
+new_metadata.to_csv('internal_samples_metadata.tsv', sep='\t', index=False)
 df.to_csv('metadata.tsv', sep='\t', index=False)
 
 # Build the new sequences.fasta
