@@ -17,7 +17,7 @@ parser.add_argument('--division', '-div', help='Division for the samples (e.g. C
 parser.add_argument('--location', '-loc', help='Location for the samples (e.g. San Francisco County)')
 parser.add_argument('--country_exposure', '-cexp', help='Country exposure (default: ?)', default='?')
 parser.add_argument('--div_exposure', '-divexp', help='Division exposure (default: ?)', default='?')
-parser.add_argument('--originating_lab', '-origlab', help='Originating lab (e.g. Biohub)')
+parser.add_argument('--originating_lab', '-origlab', help='Originating lab (e.g. Biohub)', default='?')
 parser.add_argument('--submitting_lab', '-sublab', help='Submitting lab (e.g. Biohub)')
 parser.add_argument('--date_submitted', '-subdate', help='Date of submission')
 args = parser.parse_args()
