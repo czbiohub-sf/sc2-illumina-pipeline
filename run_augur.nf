@@ -62,6 +62,7 @@ sample_metadata = params.sample_metadata ? file(params.sample_metadata, checkIfE
 if (params.sample_metadata) {
   process combineNextstrainInputs {
       publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
+      stageInMode 'copy'
 
       input:
       path(sample_sequences)
@@ -101,6 +102,7 @@ if (params.sample_metadata) {
 else {
   process makeNextstrainInputs {
     publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
+    stageInMode 'copy'
 
       input:
       path(sample_sequences)
