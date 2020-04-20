@@ -16,7 +16,6 @@ def helpMessage() {
 
     Nextstrain options:
       --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
-      --subsample  N                Subsample nextstrain sequences to N (set to false if no subsampling, default: 100)
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -53,16 +52,19 @@ clades = file(nextstrain_config + "clades.tsv", checkIfExists: true)
 auspice_config = file(nextstrain_config + "auspice_config.json", checkIfExists: true)
 lat_longs = file(nextstrain_config + "lat_longs.tsv", checkIfExists: true)
 
+
+sample_sequences  = file(params.sequences, checkIfExists: true)
+included_fastas = file(params.include_sequences, checkIfExists: true)
+
 process makeNextstrainInput {
     publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
     stageInMode 'copy'
 
     input:
     path(sample_sequences)
-    path(nextstrain_sequences) from nextstrain_subsampled_ch
+    path(nextstrain_sequences)
     path(nextstrain_metadata_path)
-    path(included_samples) from included_samples_ch
-    path(included_fastas) from included_fastas_ch
+    path(included_fastas)
     path(include_file)
 
     output:
@@ -93,8 +95,6 @@ process makeNextstrainInput {
 
 }
 
-sample_sequences  = file(params.sequences, checkIfExists: true)
-included_fastas = file(params.include_sequences, checkIfExists: true)
 
 
 process firstFilter {
