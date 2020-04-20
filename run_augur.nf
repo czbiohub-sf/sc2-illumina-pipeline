@@ -230,7 +230,7 @@ process makePriorities {
   path(metadata) from priorities_metadata
 
   output:
-  path("priorites.tsv") into priorities_tsv
+  path("priorities.tsv") into priorities_tsv
 
   script:
   """
