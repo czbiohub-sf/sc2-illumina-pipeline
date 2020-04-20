@@ -266,7 +266,7 @@ process filterStrains {
             --group-by division year month \
             --sequences-per-group 20 \
             --min-length ${params.minLength} \
-            --output filtered.fasta \
+            --output filtered_aligned.fasta \
     """
 }
 
