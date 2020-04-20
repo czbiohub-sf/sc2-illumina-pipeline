@@ -9,10 +9,12 @@ def helpMessage() {
                                     Available: conda, docker, singularity, awsbatch, test and more.
       --sample_sequences                   FASTA file of consensus sequences from main output
       --include_sequences           FASTA file of closest sequences from main output
-      --sample_metadata                    TSV of metadata from main output
-      --ref_gb                      Reference Genbank file for augur
+      --ref_gb                      Reference Genbank file for augur (default: data/MN908947.3.gb)
       --nextstrain_sequences        FASTA of sequences to build a tree with
-      --minLength                   Minimum base pair length to allow assemblies to pass QC
+      --minLength                   Minimum base pair length to allow assemblies to pass QC (default: 29000)
+
+    Optional arguments:
+    --sample_metadata             TSV of metadata from main output
 
     Nextstrain options:
       --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
@@ -78,6 +80,7 @@ if (params.sample_metadata) {
       path('included_sequences.txt') into nextstrain_include
       path("internal_samples.txt") into sample_ids
       path("external_samples.txt") into external_ids
+      path("all_sequences.fasta")
 
       script:
       // Normalize the GISAID names using Nextstrain's bash script
@@ -117,6 +120,7 @@ else {
       path('included_sequences.txt') into nextstrain_include
       path("internal_samples.txt") into sample_ids
       path("external_samples.txt") into external_ids
+      path("all_sequences.fasta")
 
       script:
       currdate = new java.util.Date().format('yyyy-MM-dd')
