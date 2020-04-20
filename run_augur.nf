@@ -79,7 +79,7 @@ process makeNextstrainInput {
     // Normalize the GISAID names using Nextstrain's bash script
     """
     make_nextstrain_input.py -ps ${nextstrain_sequences} -pm ${nextstrain_metadata_path} -ns ${sample_sequences} --date $currdate \
-    -r 'North America' -c USA -div 'California' -loc 'San Francisco County' -origlab 'Biohub' -sublab 'Biohub' \
+    -r 'North America' -c USA -div 'California' -loc 'San Francisco County' -sublab 'Biohub' \
     -subdate $currdate
 
     cat ${included_fastas} | grep '>' | awk -F '>' '{print \$2}' > included_samples.txt
