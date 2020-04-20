@@ -38,7 +38,7 @@ if (params.help) {
 
 ref_gb = file(params.ref_gb, checkIfExists: true)
 
-nextstrain_sequences_ch = Channel.from(file(params.nextstrain_sequences, checkIfExists: true))
+nextstrain_sequences = file(params.nextstrain_sequences, checkIfExists: true)
 
 nextstrain_ncov = params.nextstrain_ncov
 if (nextstrain_ncov[-1] != "/") {
@@ -53,30 +53,6 @@ clades = file(nextstrain_config + "clades.tsv", checkIfExists: true)
 auspice_config = file(nextstrain_config + "auspice_config.json", checkIfExists: true)
 lat_longs = file(nextstrain_config + "lat_longs.tsv", checkIfExists: true)
 
-process prepareSequences {
-
-    input:
-    path(nextstrain_sequences) from nextstrain_sequences_ch
-
-    output:
-    path('subsampled_sequences.fasta') into nextstrain_subsampled_ch
-
-    script:
-    if (params.subsample)
-    """
-    normalize_gisaid_fasta.sh ${nextstrain_sequences} cleaned_sequences.fasta
-    seqtk sample -s 11 cleaned_sequences.fasta ${params.subsample} > subsampled_sequences.fasta
-    seqkit faidx -r cleaned_sequences.fasta '.+Wuhan-Hu-1/2019.+' >> subsampled_sequences.fasta
-    """
-    else
-    """
-    normalize_gisaid_fasta.sh ${nextstrain_sequences} subsampled_sequences.fasta
-    """
-}
-
-sample_sequences  = file(params.sequences, checkIfExists: true)
-included_fastas = file(params.include_sequences, checkIfExists: true)
-
 process makeNextstrainInput {
     publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
     stageInMode 'copy'
@@ -90,9 +66,11 @@ process makeNextstrainInput {
     path(include_file)
 
     output:
-    path('metadata.tsv') into (nextstrain_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata, export_metadata)
-    path('deduped_sequences.fasta') into nextstrain_sequences
+    path('metadata.tsv') into (nextstrain_metadata, firstfilter_metadata, extractsamples_metadata, priorities_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata, export_metadata)
+    path('deduped_sequences.fasta') into (nextstrain_sequences, firstfilter_in)
     path('included_sequences.txt') into nextstrain_include
+    path("internal_samples.txt") into sample_ids
+    path("external_samples.txt") into external_ids
 
     script:
     currdate = new java.util.Date().format('yyyy-MM-dd')
@@ -108,8 +86,107 @@ process makeNextstrainInput {
     cat included_samples.txt ${include_file} > included_sequences.txt
     cat ${included_fastas} >> sequences.fasta
     seqkit rmdup sequences.fasta > deduped_sequences.fasta
+
+    cat ${sample_sequences} | grep '>' | awk -F '>' '{print \$2}' > internal_samples.txt
+    cat deduped_sequences.fasta | grep '>' | awk -F '>' '{print \$2}' > external_samples.txt
     """
 
+}
+
+sample_sequences  = file(params.sequences, checkIfExists: true)
+included_fastas = file(params.include_sequences, checkIfExists: true)
+
+
+process firstFilter {
+  label "nextstrain"
+
+  input:
+  path(sequences) from firstfilter_in
+  path(metadata) from firstfilter_metadata
+
+  output:
+  path("filtered_sequences.fasta") into firstfiltered_ch
+
+  script:
+  String exclude_where = "date='2020' date='2020-01-XX' date='2020-02-XX' date='2020-03-XX' date='2020-04-XX' date='2020-01' date='2020-02' date='2020-03' date='2020-04'"
+  """
+  augur filter \
+            --sequences ${sequences} \
+            --metadata ${nextstrain_metadata_path} \
+            --include ${include_file} \
+            --exclude ${exclude_file} \
+            --exclude-where ${exclude_where}\
+            --min-length ${params.minLength} \
+            --group-by division year month \
+            --sequences-per-group 500 \
+            --output filtered_sequences.fasta
+  """
+}
+
+process firstAlignment{
+  label "process_large"
+  label "nextstrain"
+
+  input:
+  path(sequences) from firstfiltered_ch
+  path(ref_gb)
+
+  output:
+  path("aligned_sequences.fasta") into (firstaligned_ch, makepriorities_ch)
+
+  script:
+  """
+  augur align \
+            --sequences ${sequences} \
+            --reference-sequence ${ref_gb} \
+            --output aligned_sequences.fasta \
+            --nthreads ${task.cpus} \
+            --remove-reference \
+            --fill-gaps
+  """
+
+}
+
+process extractSampleSequences {
+  label 'nextstrain'
+
+  input:
+  path(sequences) from firstaligned_ch
+  path(metadata) from extractsamples_metadata
+  path(include) from sample_ids
+  path(exclude) from external_ids
+
+  output:
+  path("aligned_samples.fasta") into aligned_samples_ch
+
+  script:
+  """
+  augur filter \
+            --sequences ${sequences} \
+            --metadata ${metadata} \
+            --include ${include} \
+            --exclude ${exclude} \
+            --output aligned_samples.fasta \
+  """
+}
+
+process makePriorities {
+
+  input:
+  path(sample_sequences) from aligned_samples_ch
+  path(aligned_sequences) from makepriorities_ch
+  path(metadata) from priorities_metadata
+
+  output:
+  path("priorites.tsv") into priorities_tsv
+
+  script:
+  """
+  priorities.py --alignment ${aligned_sequences} \
+                --metadata ${metadata} \
+                --focal-alignment ${sample_sequences} \
+                --output priorities.tsv
+  """
 }
 
 process filterStrains {
@@ -121,61 +198,23 @@ process filterStrains {
     path(metadata) from nextstrain_metadata
     path(include_file) from nextstrain_include
     path(exclude_file)
+    path(priorities) from priorities_tsv
 
     output:
-    path('filtered.fasta') into filtered_sequences_ch
+    path('filtered_aligned.fasta') into (aligned_ch, refinetree_alignment, ancestralsequences_alignment)
 
     script:
-    String exclude_where = "date='2020' date='2020-01-XX' date='2020-02-XX' date='2020-03-XX' date='2020-04-XX' date='2020-01' date='2020-02' date='2020-03' date='2020-04'"
-    if (params.subsample)
     """
     augur filter \
             --sequences ${sequences} \
             --metadata ${metadata} \
             --include ${include_file} \
             --exclude ${exclude_file} \
-            --exclude-where ${exclude_where} \
-            --min-length ${params.minLength} \
-            --output filtered.fasta
-    """
-    else
-    """
-    augur filter \
-            --sequences ${sequences} \
-            --metadata ${metadata} \
-            --include ${include_file} \
-            --exclude ${exclude_file} \
-            --exclude-where ${exclude_where} \
+            --priority ${priorities} \
             --group-by division year month \
             --sequences-per-group 20 \
             --min-length ${params.minLength} \
             --output filtered.fasta \
-    """
-}
-
-process alignSequences {
-    label 'nextstrain'
-    publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
-
-    cpus 4
-
-    input:
-    path(filtered_sequences) from filtered_sequences_ch
-    path(ref_fasta)
-
-    output:
-    path('aligned.fasta') into (aligned_ch, refinetree_alignment, ancestralsequences_alignment)
-
-
-    script:
-    """
-    augur align \
-        --sequences ${filtered_sequences} \
-        --reference-sequence ${ref_fasta} \
-        --output aligned.fasta \
-        --nthreads ${task.cpus} \
-        --remove-reference \
-        --fill-gaps
     """
 }
 
