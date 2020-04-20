@@ -57,9 +57,9 @@ lat_longs = file(nextstrain_config + "lat_longs.tsv", checkIfExists: true)
 sample_sequences  = file(params.sample_sequences, checkIfExists: true)
 included_contextual_fastas = file(params.include_sequences, checkIfExists: true)
 
-sample_metadata = params.sample_metadata ? file(params.metadata, checkIfExists: true) : Channel.empty()
+sample_metadata = params.sample_metadata ? file(params.sample_metadata, checkIfExists: true) : Channel.empty()
 
-if (params.metadata) {
+if (params.sample_metadata) {
   process combineNextstrainInputs {
       publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
 
