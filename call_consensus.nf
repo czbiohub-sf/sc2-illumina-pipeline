@@ -278,76 +278,9 @@ process quast {
 consensus_fa.into { quast_ch; stats_fa; merge_fastas_ch; realign_fa }
 merge_fastas_ch = merge_fastas_ch.map { it[1] }
 
-process realignConsensus {
-    tag { sampleName }
-    publishDir "${params.outdir}/realigned-seqs", mode: 'copy'
-
-    input:
-    tuple(sampleName, path(in_fa)) from realign_fa
-    path(ref_fasta)
-
-    output:
-    tuple(sampleName, path("${sampleName}.realigned.bam")) into realigned_bam
-    path("${sampleName}.realigned.bam.bai")
-
-    script:
-    """
-    minimap2 -ax asm5 -R '@RG\\tID:${sampleName}\\tSM:${sampleName}' \
-      ${ref_fasta} ${in_fa} |
-      samtools sort -O bam -o ${sampleName}.realigned.bam
-    samtools index ${sampleName}.realigned.bam
-    """
-}
-
-realigned_bam.into { call_variants_bam; combined_variants_bams }
-combined_variants_bams = combined_variants_bams.map { it[1] }.collect()
-
-process callVariants {
-    tag { sampleName }
-    publishDir "${params.outdir}/sample-variants", mode: 'copy'
-
-    input:
-    tuple(sampleName, path(in_bam)) from call_variants_bam
-    path(ref_fasta)
-
-    output:
-    tuple(sampleName, path("${sampleName}.vcf")) into assignclades_in
-    path("${sampleName}.bcftools_stats") into bcftools_stats_ch
-
-    script:
-    """
-    bcftools mpileup -f ${ref_fasta} ${in_bam} |
-      bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
-      > ${sampleName}.vcf
-    bcftools stats ${sampleName}.vcf > ${sampleName}.bcftools_stats
-    """
-}
-
-clades = file(params.clades, checkIfExists: true)
-
-process assignClades {
-    // Use Nextstrain definitions to assign clades based on mutations
-
-    input:
-    tuple(sampleName, path(vcf)) from assignclades_in
-    path(ref_gb)
-    path(clades)
-
-    output:
-    tuple(sampleName, path("${sampleName}.clades")) into assignclades_out
-
-    script:
-    """
-    assignclades.py \
-        --reference ${ref_gb} --clades ${clades} \
-        --vcf ${vcf} --sample ${sampleName}
-    """
-}
-
 stats_reads
     .join(stats_bam)
     .join(stats_fa)
-    .join(assignclades_out)
     .set { stats_ch_in }
 
 process computeStats {
@@ -359,8 +292,7 @@ process computeStats {
     tuple(sampleName,
           file(reads),
           file(trimmed_filtered_bam),
-          file(in_fa),
-          file(in_clades)) from stats_ch_in
+          file(in_fa)) from stats_ch_in
 
     output:
     file("${sampleName}.samtools_stats") into samtools_stats_out
@@ -376,27 +308,8 @@ process computeStats {
         --cleaned_bam ${trimmed_filtered_bam} \
         --samtools_stats ${sampleName}.samtools_stats \
         --assembly ${in_fa} \
-        --clades ${in_clades} \
         --out_prefix ${sampleName} \
         --reads ${reads}
-    """
-}
-
-process combinedVariants {
-    publishDir "${params.outdir}", mode: 'copy'
-
-    input:
-    path(in_bams) from combined_variants_bams
-    path(ref_fasta)
-
-    output:
-    path("combined.vcf") into combined_variants_vcf
-
-    script:
-    """
-    bcftools mpileup -f ${ref_fasta} ${in_bams} |
-      bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
-      > combined.vcf
     """
 }
 
@@ -436,54 +349,17 @@ process filterAssemblies {
     input:
     path(merged_stats) from merged_stats_ch
     path(merged_assemblies) from merged_assemblies_ch
-    path(vcf) from combined_variants_vcf
 
     output:
     path("filtered.stats.tsv")
     path("filtered.fa") into nextstrain_ch
-    path("filtered.vcf")
 
     script:
     """
     filter_assemblies.py \
-        --vcf ${vcf} \
         --max_n ${params.maxNs} --min_len ${params.minLength} \
         --stats ${merged_stats} --fasta ${merged_assemblies} \
         --out_prefix filtered
-    """
-}
-
-if (!params.intrahost_variants) {
-    intrahost_bam = Channel.empty()
-} else {
-    intrahost_bam = intrahost_bam.map { it[1] }.collect()
-}
-
-process intrahostVariants {
-    publishDir "${params.outdir}/",
-        mode: 'copy'
-
-    cpus params.intrahost_variants_cpu
-
-    input:
-    path(bam) from intrahost_bam
-    path(ref_fasta)
-
-    output:
-    path("intrahost-variants." +
-         "ploidy${params.intrahost_ploidy}-" +
-         "minfrac${params.intrahost_min_frac}.vcf")
-
-    script:
-    """
-    ls ${bam} | xargs -I % samtools index %
-    samtools faidx ${ref_fasta}
-    freebayes-parallel <(fasta_generate_regions.py ${ref_fasta}.fai 1000) ${task.cpus} \
-        --ploidy ${params.intrahost_ploidy} \
-        --min-alternate-fraction ${params.intrahost_min_frac} \
-        -f ${ref_fasta} ${bam} |
-        bcftools view -g het \
-        > intrahost-variants.ploidy${params.intrahost_ploidy}-minfrac${params.intrahost_min_frac}.vcf
     """
 }
 
@@ -495,7 +371,6 @@ process multiqc {
     path("quast_results/*/*") from multiqc_quast.collect()
     path(samtools_stats) from samtools_stats_out.collect()
     path(multiqc_config)
-    path(bcftools_stats) from bcftools_stats_ch.collect().ifEmpty([])
 
     output:
     path("*multiqc_report.html")
@@ -508,7 +383,6 @@ process multiqc {
     multiqc -f -ip --config ${multiqc_config} \
         ${samtools_stats} \
         quast_results/ \
-        ${bcftools_stats} \
         ${trim_galore_results}
     """
 }
