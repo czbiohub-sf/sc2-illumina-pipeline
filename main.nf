@@ -557,7 +557,9 @@ process mergeAssemblyStats {
     path("combined.stats.tsv") into merged_stats_ch
 
     script:
-    """merge_stats.py ${in_json} > combined.stats.tsv"""
+    """
+    merge_stats.py ${in_json} > combined.stats.tsv
+    """
 }
 
 process filterAssemblies {
