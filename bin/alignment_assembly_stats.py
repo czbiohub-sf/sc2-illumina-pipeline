@@ -18,16 +18,26 @@ parser.add_argument("--assembly")
 parser.add_argument("--samtools_stats")
 parser.add_argument("--primervcf")
 parser.add_argument("--neighborvcf")
+parser.add_argument("--neighborfasta")
 parser.add_argument("--clades")
 parser.add_argument("--out_prefix")
 parser.add_argument("--reads", nargs="+")
 args = parser.parse_args()
 
 stats = {"sample_name": args.sample_name}
+
+# keep extraction of neighbor name from VCF for compatibility with large pipeline
 if args.neighborvcf:
     neighbor_vcf = pysam.VariantFile(args.neighborvcf)
     nearest_neighbor = list(neighbor_vcf.header.contigs)[0]
     stats["nearest_sequence"] = nearest_neighbor
+
+# separate extraction of neighbor name from FASTA if no VCF
+if args.neighborfasta:
+    neighbor_fasta = SeqIO.read(args.neighborfasta, 'fasta')
+    nearest_neighbor = neighborfasta.name
+    stats["nearest_sequence"] = nearest_neighbor
+
 
 if args.cleaned_bam:
     samfile = pysam.AlignmentFile(args.cleaned_bam, "rb")
@@ -60,22 +70,23 @@ if args.reads:
                               shell=True, stdout=subprocess.PIPE).stdout
     stats["total_reads"] = int(int(fq_lines) / 4)
 
-with open(args.samtools_stats) as f:
-    sam_stats_re = re.compile(r"SN\s+([^\s].*):\s+(\d+)")
-    for line in f:
-        matched = sam_stats_re.match(line)
-        if matched:
-            if matched.group(1) == "reads mapped":
-                stats["mapped_reads"] = int(matched.group(2))
-            elif matched.group(1) == "reads mapped and paired":
-                stats["mapped_paired"] = int(matched.group(2))
-            elif matched.group(1) == "inward oriented pairs":
-                stats["paired_inward"] = int(matched.group(2)) * 2
-            elif matched.group(1) == "outward oriented pairs":
-                stats["paired_outward"] = int(matched.group(2)) * 2
-            elif matched.group(1) == "pairs with other orientation":
-                stats["paired_other_orientation"] = int(matched.group(2)) * 2
-            # TODO: number of discordant read pairs
+if args.samtools_stats:
+    with open(args.samtools_stats) as f:
+        sam_stats_re = re.compile(r"SN\s+([^\s].*):\s+(\d+)")
+        for line in f:
+            matched = sam_stats_re.match(line)
+            if matched:
+                if matched.group(1) == "reads mapped":
+                    stats["mapped_reads"] = int(matched.group(2))
+                elif matched.group(1) == "reads mapped and paired":
+                    stats["mapped_paired"] = int(matched.group(2))
+                elif matched.group(1) == "inward oriented pairs":
+                    stats["paired_inward"] = int(matched.group(2)) * 2
+                elif matched.group(1) == "outward oriented pairs":
+                    stats["paired_outward"] = int(matched.group(2)) * 2
+                elif matched.group(1) == "pairs with other orientation":
+                    stats["paired_other_orientation"] = int(matched.group(2)) * 2
+                # TODO: number of discordant read pairs
 
 def countVCF(vcf_file, snpcol, mnpcol, indelcol, statsdict):
     vcf = pysam.VariantFile(vcf_file)

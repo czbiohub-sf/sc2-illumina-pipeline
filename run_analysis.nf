@@ -17,6 +17,7 @@ def helpMessage() {
 
     Optional arguments:
       --sample_metadata             TSV of metadata from main output
+      --clades                      TSV with clades from nextstrain (default: data/clades.tsv)
 
     Nextstrain options:
       --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
@@ -45,7 +46,7 @@ ref_fasta = file(params.ref, checkIfExists: true)
 
 Channel
   .fromFilePairs(params.sample_sequences, size: 1)
-  .into{blastconsensus_in; realign_fa}
+  .into{blastconsensus_in; realign_fa; stats_fa}
 
 process realignConsensus {
     tag { sampleName }
@@ -80,7 +81,7 @@ process callVariants {
     path(ref_fasta)
 
     output:
-    tuple(sampleName, path("${sampleName}.vcf")) into primer_variants_ch
+    tuple(sampleName, path("${sampleName}.vcf")) into variants_ch
     path("${sampleName}.bcftools_stats") into bcftools_stats_ch
 
     script:
@@ -89,6 +90,29 @@ process callVariants {
       bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
       > ${sampleName}.vcf
     bcftools stats ${sampleName}.vcf > ${sampleName}.bcftools_stats
+    """
+}
+
+variants_ch.into {primer_variants_ch; assignclades_in}
+
+clades = file(params.clades, checkIfExists: true)
+
+process assignClades {
+    // Use Nextstrain definitions to assign clades based on mutations
+
+    input:
+    tuple(sampleName, path(vcf)) from assignclades_in
+    path(ref_gb)
+    path(clades)
+
+    output:
+    tuple(sampleName, path("${sampleName}.clades")) into assignclades_out
+
+    script:
+    """
+    assignclades.py \
+        --reference ${ref_gb} --clades ${clades} \
+        --vcf ${vcf} --sample ${sampleName}
     """
 }
 
@@ -118,6 +142,40 @@ process searchPrimers {
     bcftools index ${vcf}.gz
     bcftools view -R ${qpcr_primers} -o ${sampleName}_primers.vcf ${vcf}.gz
     bcftools stats ${sampleName}_primers.vcf > ${sampleName}_primers.primer_variants_stats
+    """
+}
+
+if (!params.intrahost_variants) {
+    intrahost_bam = Channel.empty()
+} else {
+    intrahost_bam = intrahost_bam.map { it[1] }.collect()
+}
+
+process intrahostVariants {
+    publishDir "${params.outdir}/",
+        mode: 'copy'
+
+    cpus params.intrahost_variants_cpu
+
+    input:
+    path(bam) from intrahost_bam
+    path(ref_fasta)
+
+    output:
+    path("intrahost-variants." +
+         "ploidy${params.intrahost_ploidy}-" +
+         "minfrac${params.intrahost_min_frac}.vcf")
+
+    script:
+    """
+    ls ${bam} | xargs -I % samtools index %
+    samtools faidx ${ref_fasta}
+    freebayes-parallel <(fasta_generate_regions.py ${ref_fasta}.fai 1000) ${task.cpus} \
+        --ploidy ${params.intrahost_ploidy} \
+        --min-alternate-fraction ${params.intrahost_min_frac} \
+        -f ${ref_fasta} ${bam} |
+        bcftools view -g het \
+        > intrahost-variants.ploidy${params.intrahost_ploidy}-minfrac${params.intrahost_min_frac}.vcf
     """
 }
 
@@ -178,6 +236,40 @@ process collectNearest {
     """
     cat ${fastas} > all_included_samples.fasta
     seqkit rmdup all_included_samples.fasta > included_samples.fasta
+    """
+}
+
+stats_fa
+  .join(primer_variants_vcf)
+  .join(assignclades_out)
+  .join(nearest_neighbor)
+  .set{stats_ch_in}
+
+process computeStats {
+    tag { sampleName }
+    publishDir "${params.outdir}/coverage-plots", mode: 'copy',
+        saveAs: { x -> x.endsWith(".png") ? x : null }
+
+    input:
+    tuple(sampleName,
+          file(in_fa),
+          file(primer_vcf),
+          file(in_clades),
+          file(neighbor_fasta) from stats_ch_in
+
+    output:
+    path("${sampleName}.stats.json") into stats_ch
+    path("${sampleName}.depths.png")
+
+    script:
+    """
+    alignment_assembly_stats.py \
+        --sample_name ${sampleName} \
+        --assembly ${in_fa} \
+        --primervcf ${primer_vcf} \
+        --neighborfasta ${neighbor_fasta} \
+        --clades ${in_clades} \
+        --out_prefix ${sampleName}
     """
 }
 
