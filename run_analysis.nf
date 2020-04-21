@@ -7,11 +7,13 @@ def helpMessage() {
     Mandatory arguments:
       -profile                      Configuration profile to use. Can use multiple (comma separated)
                                     Available: conda, docker, singularity, awsbatch, test and more.
-      --sample_sequences                   FASTA file of consensus sequences from main output
-      --include_sequences           FASTA file of closest sequences from main output
+      --sample_sequences            Glob pattern of sample sequences from main output
+      --ref                         Reference FASTA file (default: data/MN908947.3.fa)
       --ref_gb                      Reference Genbank file for augur (default: data/MN908947.3.gb)
+      --blast_sequences             FASTA of sequences for BLAST alignment
       --nextstrain_sequences        FASTA of sequences to build a tree with
       --minLength                   Minimum base pair length to allow assemblies to pass QC (default: 29000)
+      --maxNs                       Max number of Ns to allow assemblies to pass QC (default: 100)
 
     Optional arguments:
       --sample_metadata             TSV of metadata from main output
@@ -39,28 +41,171 @@ if (params.help) {
     exit 0
 }
 
-ref_gb = file(params.ref_gb, checkIfExists: true)
+ref_fasta = file(params.ref, checkIfExists: true)
 
-nextstrain_sequences = file(params.nextstrain_sequences, checkIfExists: true)
+Channel
+  .fromFilePairs(params.sample_sequences, size: 1)
+  .into{blastconsensus_in; realign_fa}
 
-nextstrain_ncov = params.nextstrain_ncov
-if (nextstrain_ncov[-1] != "/") {
-    nextstrain_ncov = nextstrain_ncov + "/"
+process realignConsensus {
+    tag { sampleName }
+    publishDir "${params.outdir}/realigned-seqs", mode: 'copy'
+
+    input:
+    tuple(sampleName, path(in_fa)) from realign_fa
+    path(ref_fasta)
+
+    output:
+    tuple(sampleName, path("${sampleName}.realigned.bam")) into realigned_bam
+    path("${sampleName}.realigned.bam.bai")
+
+    script:
+    """
+    minimap2 -ax asm5 -R '@RG\\tID:${sampleName}\\tSM:${sampleName}' \
+      ${ref_fasta} ${in_fa} |
+      samtools sort -O bam -o ${sampleName}.realigned.bam
+    samtools index ${sampleName}.realigned.bam
+    """
 }
 
-nextstrain_metadata_path = file(nextstrain_ncov + "data/metadata.tsv", checkIfExists: true)
-nextstrain_config = nextstrain_ncov + "config/"
-include_file = file(nextstrain_config + "include.txt", checkIfExists: true)
-exclude_file = file(nextstrain_config + "exclude.txt", checkIfExists: true)
-clades = file(nextstrain_config + "clades.tsv", checkIfExists: true)
-auspice_config = file(nextstrain_config + "auspice_config.json", checkIfExists: true)
-lat_longs = file(nextstrain_config + "lat_longs.tsv", checkIfExists: true)
+realigned_bam.into { call_variants_bam; combined_variants_bams }
+combined_variants_bams = combined_variants_bams.map { it[1] }.collect()
+
+process callVariants {
+    tag { sampleName }
+    publishDir "${params.outdir}/sample-variants", mode: 'copy'
+
+    input:
+    tuple(sampleName, path(in_bam)) from call_variants_bam
+    path(ref_fasta)
+
+    output:
+    tuple(sampleName, path("${sampleName}.vcf")) into primer_variants_ch
+    path("${sampleName}.bcftools_stats") into bcftools_stats_ch
+
+    script:
+    """
+    bcftools mpileup -f ${ref_fasta} ${in_bam} |
+      bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
+      > ${sampleName}.vcf
+    bcftools stats ${sampleName}.vcf > ${sampleName}.bcftools_stats
+    """
+}
+
+if (params.qpcr_primers) {
+    qpcr_primers = file(params.qpcr_primers, checkIfExists: true)
+} else {
+    qpcr_primers = Channel.empty()
+}
+
+process searchPrimers {
+    publishDir "${params.outdir}/primer-variants", mode: 'copy'
+
+    input:
+    tuple(sampleName, path(vcf)) from primer_variants_ch
+    path(qpcr_primers)
+
+    output:
+    tuple(sampleName, path("${sampleName}_primers.vcf")) into primer_variants_vcf
+    path("${sampleName}_primers.primer_variants_stats") into primer_stats_ch
+
+    when:
+    params.qpcr_primers
+
+    script:
+    """
+    bgzip ${vcf}
+    bcftools index ${vcf}.gz
+    bcftools view -R ${qpcr_primers} -o ${sampleName}_primers.vcf ${vcf}.gz
+    bcftools stats ${sampleName}_primers.vcf > ${sampleName}_primers.primer_variants_stats
+    """
+}
+
+blast_sequences = params.blast_sequences ? file(params.blast_sequences, checkIfExists: true) : Channel.empty()
+
+process buildBLASTDB {
+
+    input:
+    path(blast_sequences)
+
+    output:
+    path("blast_seqs.nt*") into blastdb_ch
+    path("blast_sequences.fasta") into blast_clean_ch
+
+    script:
+    """
+    normalize_gisaid_fasta.sh ${blast_sequences} blast_seqs_clean.fasta
+    sed 's/\\.//g' blast_seqs_clean.fasta > blast_sequences.fasta
+
+    makeblastdb -in blast_sequences.fasta -parse_seqids -title 'blastseqs' -dbtype nucl -out blast_seqs.nt
+    """
+}
+
+process blastConsensus {
+    tag {sampleName}
+    publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
+
+    input:
+    tuple(sampleName, path(assembly)) from blastconsensus_in
+    path(dbsequences) from blast_clean_ch
+    path(blastdb) from blastdb_ch
+    path(ref_fasta)
+
+    output:
+    path("${sampleName}.blast.tsv")
+    tuple(sampleName, path("${sampleName}_nearest_blast.fasta")) into (nearest_neighbor, collectnearest_in)
+
+    script:
+    """
+    get_top_hit.py --minLength ${params.minLength} \
+      --sequences ${dbsequences} \
+      --sampleName ${sampleName} \
+      --assembly ${assembly} \
+      --default ${ref_fasta}
+    """
+}
+
+process collectNearest {
+    publishDir "${params.outdir}/BLAST", mode: 'copy'
+
+    input:
+    path(fastas) from collectnearest_in.map{it[1]}.collect()
+
+    output:
+    path("included_samples.fasta") into included_fastas_ch
+
+    script:
+    """
+    cat ${fastas} > all_included_samples.fasta
+    seqkit rmdup all_included_samples.fasta > included_samples.fasta
+    """
+}
+
+// Setup nextstrain files
+
+if (params.nextstrain_sequences && params.nextstrain_ncov) {
+  ref_gb = file(params.ref_gb, checkIfExists: true)
+  nextstrain_sequences = file(params.nextstrain_sequences, checkIfExists: true)
+
+  nextstrain_ncov = params.nextstrain_ncov
+  if (nextstrain_ncov[-1] != "/") {
+      nextstrain_ncov = nextstrain_ncov + "/"
+  }
+
+  nextstrain_metadata_path = file(nextstrain_ncov + "data/metadata.tsv", checkIfExists: true)
+  nextstrain_config = nextstrain_ncov + "config/"
+  include_file = file(nextstrain_config + "include.txt", checkIfExists: true)
+  exclude_file = file(nextstrain_config + "exclude.txt", checkIfExists: true)
+  clades = file(nextstrain_config + "clades.tsv", checkIfExists: true)
+  auspice_config = file(nextstrain_config + "auspice_config.json", checkIfExists: true)
+  lat_longs = file(nextstrain_config + "lat_longs.tsv", checkIfExists: true)
 
 
-sample_sequences  = file(params.sample_sequences, checkIfExists: true)
-included_contextual_fastas = file(params.include_sequences, checkIfExists: true)
+  sample_sequences  = file(params.sample_sequences, checkIfExists: true)
+  included_contextual_fastas = file(params.include_sequences, checkIfExists: true)
 
-sample_metadata = params.sample_metadata ? file(params.sample_metadata, checkIfExists: true) : Channel.empty()
+  sample_metadata = params.sample_metadata ? file(params.sample_metadata, checkIfExists: true) : Channel.empty()
+}
 
 if (params.sample_metadata) {
   process combineNextstrainInputs {
@@ -71,7 +216,7 @@ if (params.sample_metadata) {
       path(sample_sequences)
       path(nextstrain_sequences)
       path(nextstrain_metadata_path)
-      path(included_contextual_fastas)
+      path(included_contextual_fastas) from included_fastas_ch
       path(include_file)
       path(sample_metadata)
 
