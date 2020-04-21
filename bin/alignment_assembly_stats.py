@@ -29,34 +29,36 @@ if args.neighborvcf:
     nearest_neighbor = list(neighbor_vcf.header.contigs)[0]
     stats["nearest_sequence"] = nearest_neighbor
 
-samfile = pysam.AlignmentFile(args.cleaned_bam, "rb")
-ref_len, = samfile.lengths
-depths = [0] * ref_len
-for column in samfile.pileup():
-    depths[column.reference_pos] = column.nsegments
-depths = np.array(depths)
+if args.cleaned_bam:
+    samfile = pysam.AlignmentFile(args.cleaned_bam, "rb")
+    ref_len, = samfile.lengths
+    depths = [0] * ref_len
+    for column in samfile.pileup():
+        depths[column.reference_pos] = column.nsegments
+    depths = np.array(depths)
 
-stats["depth_avg"] = depths.mean()
-stats["depth_q.25"] = np.quantile(depths, .25)
-stats["depth_q.5"] = np.quantile(depths, .5)
-stats["depth_q.75"] = np.quantile(depths, .75)
-stats["depth_frac_above_10x"] = (depths >= 10).mean()
-stats["depth_frac_above_25x"] = (depths >= 30).mean()
-stats["depth_frac_above_50x"] = (depths >= 30).mean()
-stats["depth_frac_above_100x"] = (depths >= 100).mean()
+    stats["depth_avg"] = depths.mean()
+    stats["depth_q.25"] = np.quantile(depths, .25)
+    stats["depth_q.5"] = np.quantile(depths, .5)
+    stats["depth_q.75"] = np.quantile(depths, .75)
+    stats["depth_frac_above_10x"] = (depths >= 10).mean()
+    stats["depth_frac_above_25x"] = (depths >= 30).mean()
+    stats["depth_frac_above_50x"] = (depths >= 30).mean()
+    stats["depth_frac_above_100x"] = (depths >= 100).mean()
 
-ax = sns.lineplot(np.arange(1, ref_len+1), depths)
-ax.set_title(args.sample_name)
-ax.set(xlabel="position", ylabel="depth")
-plt.yscale("symlog")
-plt.savefig(args.out_prefix + ".depths.png")
+    ax = sns.lineplot(np.arange(1, ref_len+1), depths)
+    ax.set_title(args.sample_name)
+    ax.set(xlabel="position", ylabel="depth")
+    plt.yscale("symlog")
+    plt.savefig(args.out_prefix + ".depths.png")
 
 seq, = SeqIO.parse(args.assembly, "fasta")
 stats["allele_counts"] = dict(collections.Counter(str(seq.seq)))
 
-fq_lines = subprocess.run(" ".join(["zcat"] + list(args.reads)) + " | wc -l",
-                          shell=True, stdout=subprocess.PIPE).stdout
-stats["total_reads"] = int(int(fq_lines) / 4)
+if args.reads:
+    fq_lines = subprocess.run(" ".join(["zcat"] + list(args.reads)) + " | wc -l",
+                              shell=True, stdout=subprocess.PIPE).stdout
+    stats["total_reads"] = int(int(fq_lines) / 4)
 
 with open(args.samtools_stats) as f:
     sam_stats_re = re.compile(r"SN\s+([^\s].*):\s+(\d+)")
@@ -96,11 +98,11 @@ if args.primervcf:
     stats = {**stats, **countVCF(args.primervcf, 'primer_snps', 'primer_mnps', 'primer_indels', stats)}
 if args.neighborvcf:
     stats = {**stats, **countVCF(args.neighborvcf, 'new_snps', 'new_mnps', 'new_indels', stats)}
-
-stats["clade"] = []
-with open(args.clades) as f:
-    for line in f:
-        stats["clade"].append(line.strip())
+if args.clades:
+    stats["clade"] = []
+    with open(args.clades) as f:
+        for line in f:
+            stats["clade"].append(line.strip())
 
 with open(args.out_prefix + ".stats.json", "w") as f:
     json.dump(stats, f, indent=2)
