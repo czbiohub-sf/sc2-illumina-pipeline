@@ -255,7 +255,7 @@ process computeStats {
           file(in_fa),
           file(primer_vcf),
           file(in_clades),
-          file(neighbor_fasta) from stats_ch_in
+          file(neighbor_fasta)) from stats_ch_in
 
     output:
     path("${sampleName}.stats.json") into stats_ch
@@ -270,6 +270,24 @@ process computeStats {
         --neighborfasta ${neighbor_fasta} \
         --clades ${in_clades} \
         --out_prefix ${sampleName}
+    """
+}
+
+process combinedVariants {
+    publishDir "${params.outdir}", mode: 'copy'
+
+    input:
+    path(in_bams) from combined_variants_bams
+    path(ref_fasta)
+
+    output:
+    path("combined.vcf") into combined_variants_vcf
+
+    script:
+    """
+    bcftools mpileup -f ${ref_fasta} ${in_bams} |
+      bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
+      > combined.vcf
     """
 }
 
