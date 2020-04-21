@@ -14,7 +14,7 @@ def helpMessage() {
       --minLength                   Minimum base pair length to allow assemblies to pass QC (default: 29000)
 
     Optional arguments:
-    --sample_metadata             TSV of metadata from main output
+      --sample_metadata             TSV of metadata from main output
 
     Nextstrain options:
       --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
