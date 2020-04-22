@@ -12,7 +12,7 @@ def label_reference_subtree(ll, new_sample_string):
     for node in ll.Objects:
         node.traits['ref'] = False
 
-    ref_nodes = ll.getExternal(lambda k: new_sample_string not in k.traits['name'])
+    ref_nodes = ll.getExternal(lambda k: new_sample_string != k.traits['node_attrs']['submitting_lab']['value'])
     while len(ref_nodes) > 0:
         node = ref_nodes.pop()
         node.traits['ref'] = True
