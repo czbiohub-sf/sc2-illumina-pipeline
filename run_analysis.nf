@@ -43,6 +43,7 @@ if (params.help) {
 }
 
 ref_fasta = file(params.ref, checkIfExists: true)
+ref_gb = params.ref_gb ? file(params.ref_gb, checkIfExists: true) : Channel.empty()
 
 Channel
   .fromFilePairs(params.sample_sequences, size: 1)
