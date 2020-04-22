@@ -427,7 +427,7 @@ else {
       path(sample_sequences) from nextstrain_ch
       path(nextstrain_sequences)
       path(nextstrain_metadata_path)
-      path(included_contextual_fastas)
+      path(included_contextual_fastas) from included_fastas_ch
       path(include_file)
 
       output:
