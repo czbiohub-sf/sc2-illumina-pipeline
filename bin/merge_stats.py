@@ -31,7 +31,8 @@ for fname in sys.argv[2:]:
     row["n_missing"] = allele_counts["N"]
     row["n_gap"] = allele_counts["-"]
     row["n_ambiguous"] = sum(v for k, v in allele_counts.items() if k not in "ACTGUN-")
-    row["clade"] = ";".join(row["clade"])
+    if (sys.argv[1] == 'analysis') or (sys.argv[1] == 'all'):
+        row["clade"] = ";".join(row["clade"])
 
     reordered_row = {}
     for key in col_keys:
