@@ -47,7 +47,7 @@ ref_gb = params.ref_gb ? file(params.ref_gb, checkIfExists: true) : Channel.empt
 
 Channel
   .fromFilePairs(params.sample_sequences, size: 1)
-  .into{blastconsensus_in; realign_fa; stats_fa; merged_fastas_ch}
+  .into{blastconsensus_in; realign_fa; stats_fa; merge_fastas_ch}
 
 process realignConsensus {
     tag { sampleName }
