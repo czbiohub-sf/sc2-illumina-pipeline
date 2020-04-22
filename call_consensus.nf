@@ -339,7 +339,7 @@ process mergeAssemblyStats {
 
     script:
     """
-    merge_basic_stats.py ${in_json} > combined.stats.tsv
+    merge_stats.py core ${in_json} > combined.stats.tsv
     """
 }
 

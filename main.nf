@@ -558,7 +558,7 @@ process mergeAssemblyStats {
 
     script:
     """
-    merge_stats.py ${in_json} > combined.stats.tsv
+    merge_stats.py all ${in_json} > combined.stats.tsv
     """
 }
 
