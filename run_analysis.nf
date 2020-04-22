@@ -268,7 +268,6 @@ process computeStats {
 
     output:
     path("${sampleName}.stats.json") into stats_ch
-    path("${sampleName}.depths.png")
 
     script:
     """
