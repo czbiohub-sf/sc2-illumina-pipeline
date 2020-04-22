@@ -11,3 +11,12 @@ ENV PATH /opt/conda/envs/sc2-msspe/bin/:$PATH
 
 # Dump the details of the installed packages to a file for posterity
 RUN conda env export --name nf-core-msspe-1.0dev > nf-core-msspe-1.0dev.yaml
+
+# Install baltic
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y git
+
+RUN git clone https://github.com/evogytis/baltic.git && \
+	cd baltic && \
+	python setup.py install
