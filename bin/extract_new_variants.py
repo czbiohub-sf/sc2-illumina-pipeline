@@ -24,7 +24,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     parser.add_argument("--pipeline_dir")
     parser.add_argument("--out_path")
-    parser.add_argument("--new_sample_string", default='RR057')
+    parser.add_argument("--new_sample_string", default='Biohub')
     args = parser.parse_args()
 
     with open(os.path.join(args.pipeline_dir, 'ncov.json')) as fp:
