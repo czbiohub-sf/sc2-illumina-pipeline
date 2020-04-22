@@ -46,7 +46,7 @@ ref_fasta = file(params.ref, checkIfExists: true)
 
 Channel
   .fromFilePairs(params.sample_sequences, size: 1)
-  .into{blastconsensus_in; realign_fa; stats_fa}
+  .into{blastconsensus_in; realign_fa; stats_fa; merged_fastas_ch}
 
 process realignConsensus {
     tag { sampleName }
@@ -93,7 +93,7 @@ process callVariants {
     """
 }
 
-variants_ch.into {primer_variants_ch; assignclades_in}
+variants_ch.into {primer_variants_ch; assignclades_in; variants_ch}
 
 clades = file(params.clades, checkIfExists: true)
 
@@ -240,6 +240,7 @@ process collectNearest {
 }
 
 stats_fa
+  .join(variants_ch)
   .join(primer_variants_vcf)
   .join(assignclades_out)
   .join(nearest_neighbor)
@@ -253,6 +254,7 @@ process computeStats {
     input:
     tuple(sampleName,
           file(in_fa),
+          file(vcf),
           file(primer_vcf),
           file(in_clades),
           file(neighbor_fasta)) from stats_ch_in
@@ -266,6 +268,7 @@ process computeStats {
     alignment_assembly_stats.py \
         --sample_name ${sampleName} \
         --assembly ${in_fa} \
+        --vcf ${vcf} \
         --primervcf ${primer_vcf} \
         --neighborfasta ${neighbor_fasta} \
         --clades ${in_clades} \
@@ -288,6 +291,59 @@ process combinedVariants {
     bcftools mpileup -f ${ref_fasta} ${in_bams} |
       bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
       > combined.vcf
+    """
+}
+
+process mergeAllAssemblies {
+    publishDir "${params.outdir}", mode: 'copy'
+
+    input:
+    path(in_fasta) from merge_fastas_ch.collect()
+
+    output:
+    path("combined.fa") into merged_assemblies_ch
+
+    script:
+    """
+    cat ${in_fasta} > combined.fa
+    """
+}
+
+process mergeAssemblyStats {
+    publishDir "${params.outdir}", mode: 'copy'
+
+    input:
+    path(in_json) from stats_ch.collect()
+
+    output:
+    path("combined.stats.tsv") into merged_stats_ch
+
+    script:
+    """
+    merge_stats.py analysis ${in_json} > combined.stats.tsv
+    """
+}
+
+process filterAssemblies {
+    publishDir "${params.outdir}", mode: 'copy'
+
+    input:
+    path(merged_stats) from merged_stats_ch
+    path(merged_assemblies) from merged_assemblies_ch
+    path(vcf) from combined_variants_vcf
+
+    output:
+    path("filtered.stats.tsv")
+    path("filtered.fa") into nextstrain_ch
+    path("filtered.vcf")
+
+    script:
+    """
+    filter_assemblies.py \
+        --vcf ${vcf} \
+        --max_n ${params.maxNs} --min_len ${params.minLength} \
+        --stats ${merged_stats} --fasta ${merged_assemblies} \
+        --out_prefix filtered
     """
 }
 
@@ -323,7 +379,7 @@ if (params.sample_metadata) {
       stageInMode 'copy'
 
       input:
-      path(sample_sequences)
+      path(sample_sequences) from nextstrain_ch
       path(nextstrain_sequences)
       path(nextstrain_metadata_path)
       path(included_contextual_fastas) from included_fastas_ch
@@ -364,7 +420,7 @@ else {
     stageInMode 'copy'
 
       input:
-      path(sample_sequences)
+      path(sample_sequences) from nextstrain_ch
       path(nextstrain_sequences)
       path(nextstrain_metadata_path)
       path(included_contextual_fastas)
@@ -436,7 +492,7 @@ process firstFilter {
   """
 }
 
-process firstAlignment{
+process alignSequences {
   label "process_large"
   label "nextstrain"
   publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
@@ -723,7 +779,7 @@ process exportData {
     path(clades) from export_clades
 
     output:
-    path('ncov.json')
+    path('ncov.json') into extractvariants_in
 
     script:
     """
@@ -735,4 +791,19 @@ process exportData {
         --lat-longs ${lat_longs} \
         --output ncov.json
     """
+}
+
+process extractNewVariants {
+  publishDir "${params.outdir}", mode: 'copy'
+
+  input:
+  path(ncov_json) from extractvariants_in
+
+  output:
+  path("new_mutations.csv")
+
+  script:
+  """
+  extract_new_variants.py --pipeline_dir . --out_path new_mutations.csv --new_sample_string Biohub
+  """
 }

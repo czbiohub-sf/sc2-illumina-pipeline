@@ -16,6 +16,7 @@ parser.add_argument("--sample_name")
 parser.add_argument("--cleaned_bam")
 parser.add_argument("--assembly")
 parser.add_argument("--samtools_stats")
+parser.add_argument("--vcf", help="reference SNPs")
 parser.add_argument("--primervcf")
 parser.add_argument("--neighborvcf")
 parser.add_argument("--neighborfasta")
@@ -33,7 +34,7 @@ if args.neighborvcf:
     stats["nearest_sequence"] = nearest_neighbor
 
 # separate extraction of neighbor name from FASTA if no VCF
-if args.neighborfasta:
+elif args.neighborfasta:
     neighbor_fasta = SeqIO.read(args.neighborfasta, 'fasta')
     nearest_neighbor = neighborfasta.name
     stats["nearest_sequence"] = nearest_neighbor
@@ -104,7 +105,8 @@ def countVCF(vcf_file, snpcol, mnpcol, indelcol, statsdict):
             else:
                 statsdict[mnpcol] += 1
     return statsdict
-
+if args.vcf:
+    stats = {**stats, **countVCF(args.vcf, 'ref_snps', 'ref_mnps', 'ref_indels', stats)}
 if args.primervcf:
     stats = {**stats, **countVCF(args.primervcf, 'primer_snps', 'primer_mnps', 'primer_indels', stats)}
 if args.neighborvcf:

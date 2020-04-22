@@ -13,7 +13,8 @@ if sys.argv[1] == 'core':
                 "n_ambiguous"]
 elif sys.argv[1] == 'analysis':
     col_keys = ["sample_name", "clade", "n_actg", "n_missing", "n_gap",
-                "n_ambiguous", "nearest_sequence"]
+                "n_ambiguous", "nearest_sequence",
+                "ref_snps", "ref_mnps", "ref_indels"]
 elif sys.argv[1] == 'all':
     col_keys = ["sample_name", "clade", "depth_avg", "mapped_reads",
                 "total_reads", "n_actg", "n_missing", "n_gap",
