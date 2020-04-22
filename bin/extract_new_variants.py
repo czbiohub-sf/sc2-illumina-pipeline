@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import baltic as bt
 import argparse
 import os, json
