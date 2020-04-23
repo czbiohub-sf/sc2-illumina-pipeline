@@ -21,6 +21,7 @@ def helpMessage() {
 
     Nextstrain options:
       --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
+      --group_by                    string, parameter to augur filter (default: 'division year month')
       --sequences_per_group_1       Initial subsampling (default: 500)
       --sequences_per_group_2       Contextual subsampling by priority (default: 20)
 
@@ -491,7 +492,7 @@ process firstFilter {
             --exclude ${exclude_file} \
             --exclude-where ${exclude_where}\
             --min-length ${params.minLength} \
-            --group-by division year month \
+            --group-by ${params.group_by} \
             --sequences-per-group ${params.sequences_per_group_1} \
             --output filtered_sequences.fasta
   """
@@ -590,7 +591,7 @@ process filterStrains {
             --include ${include_file} \
             --exclude ${exclude_file} \
             --priority ${priorities} \
-            --group-by division year month \
+            --group-by ${params.group_by} \
             --sequences-per-group ${params.sequences_per_group_2} \
             --min-length ${params.minLength} \
             --output filtered_aligned.fasta \
