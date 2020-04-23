@@ -22,7 +22,6 @@ def helpMessage() {
       --maxNs                       Max number of Ns to allow assemblies to pass QC
       --minLength                   Minimum base pair length to allow assemblies to pass QC
       --no_reads_quast              Run QUAST without aligning reads
-      --clades                      TSV file with columns clade, gene, site, alt (augur clades format)
 
     Other options:
       --outdir                      The output directory where the results will be saved
