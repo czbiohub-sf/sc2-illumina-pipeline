@@ -47,12 +47,12 @@ ref_gb = params.ref_gb ? file(params.ref_gb, checkIfExists: true) : Channel.empt
 
 
 Channel
-  .fromPath(params.sample_sequences, size: 1)
+  .fromPath(params.sample_sequences)
   .map {file -> tuple(file.simpleName, file) }
   .into {blastconsensus_in; realign_fa; stats_fa}
 
 Channel
-  .fromPath(params.sample_sequences, size: 1)
+  .fromPath(params.sample_sequences)
   .set {sample_sequences}
 
 
