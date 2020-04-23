@@ -7,7 +7,7 @@ def helpMessage() {
     Mandatory arguments:
       -profile                      Configuration profile to use. Can use multiple (comma separated)
                                     Available: conda, docker, singularity, awsbatch, test and more.
-      --sample_sequences            Glob pattern of sample sequences from main output
+      --sample_sequences            combined sample sequences from main output
       --ref                         Reference FASTA file (default: data/MN908947.3.fa)
       --ref_gb                      Reference Genbank file for augur (default: data/MN908947.3.gb)
       --blast_sequences             FASTA of sequences for BLAST alignment
@@ -45,14 +45,16 @@ if (params.help) {
 ref_fasta = file(params.ref, checkIfExists: true)
 ref_gb = params.ref_gb ? file(params.ref_gb, checkIfExists: true) : Channel.empty()
 
-Channel
-  .fromFilePairs(params.sample_sequences, size: 1)
-  .into{blastconsensus_in; realign_fa; stats_fa}
 
 Channel
-  .fromFilePairs(params.sample_sequences, size: 1)
-  .map { it[1] }
-  .set {merge_fastas_ch}
+  .fromPath(params.sample_sequences)
+  .splitFasta( record: [id: true, sequence: true], file: true)
+  .into { blastconsensus_in; realign_fa; stats_fa }
+
+Channel
+  .fromPath(params.sample_sequences)
+  .splitFasta( file: true )
+  .into { merge_fastas_ch }
 
 
 process realignConsensus {
