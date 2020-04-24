@@ -300,6 +300,7 @@ process blastConsensus {
 }
 
 process collectNearest {
+    publishDir "${params.outdir}/BLAST", mode: 'copy'
 
     input:
     path(fastas) from collectnearest_ch.map{it[1]}.collect()
@@ -556,7 +557,9 @@ process mergeAssemblyStats {
     path("combined.stats.tsv") into merged_stats_ch
 
     script:
-    """merge_stats.py ${in_json} > combined.stats.tsv"""
+    """
+    merge_stats.py all ${in_json} > combined.stats.tsv
+    """
 }
 
 process filterAssemblies {
