@@ -22,6 +22,7 @@ def helpMessage() {
       --maxNs                       Max number of Ns to allow assemblies to pass QC
       --minLength                   Minimum base pair length to allow assemblies to pass QC
       --no_reads_quast              Run QUAST without aligning reads
+      --ercc_fasta                  Default: data/ERCC_sequences.fasta
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -82,6 +83,8 @@ if (params.kraken2_db == "") {
     reads_ch = Channel.empty()
     kraken2_db = file(params.kraken2_db, checkIfExists: true)
 }
+
+ercc_fasta = file(params.ercc_fasta, checkIfExists: true)
 
 process filterReads {
     tag { sampleName }
