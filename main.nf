@@ -32,7 +32,8 @@ def helpMessage() {
 
     Nextstrain options:
       --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
-
+      --subsample  N                Subsample nextstrain sequences to N (set to false if no subsampling, default: 100)
+      --sample_dates                Custom sample collection dates if available, otherwise uses current date (TSV, columns should be 'strain' and 'date')
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -178,9 +179,14 @@ process trimReads {
     if [ "\$LINES" -gt 0 ];
     then
         trim_galore --fastqc --paired ${reads}
+        TRIMMED=\$(zcat ${sampleName}_covid_1_val_1.fq.gz | wc -l)
+        if [ "\$TRIMMED" == 0 ];
+        then
+            rm -r *fastqc.zip
+        fi
     else
-        cp ${reads[0]} ${sampleName}_1_val_1.fq.gz
-        cp ${reads[1]} ${sampleName}_2_val_2.fq.gz
+        cp ${reads[0]} ${sampleName}_covid_1_val_1.fq.gz
+        cp ${reads[1]} ${sampleName}_covid_2_val_2.fq.gz
     fi
     """
 }
@@ -193,8 +199,7 @@ reads_ch.into { minimap2_reads_in; quast_reads }
 
 process alignReads {
     tag { sampleName }
-
-    cpus 4
+    label 'process_medium'
 
     input:
     tuple(sampleName, file(reads)) from minimap2_reads_in
@@ -206,7 +211,7 @@ process alignReads {
     script:
     """
     minimap2 -ax sr -R '@RG\\tID:${sampleName}\\tSM:${sampleName}' ${ref_fasta} ${reads} |
-      samtools sort -@ 2 -O bam -o ${sampleName}.bam
+      samtools sort -@ ${task.cpus-1} -O bam -o ${sampleName}.bam
     """
 }
 
@@ -286,11 +291,27 @@ process blastConsensus {
 
     output:
     path("${sampleName}.blast.tsv")
-    tuple(sampleName, path("nearest_blast.fasta")) into nearest_neighbor
+    tuple(sampleName, path("${sampleName}_nearest_blast.fasta")) into (nearest_neighbor, collectnearest_ch)
 
     script:
     """
     get_top_hit.py --minLength ${params.minLength} --sequences ${dbsequences} --sampleName ${sampleName} --assembly ${assembly} --default ${ref_fasta}
+    """
+}
+
+process collectNearest {
+
+    input:
+    path(fastas) from collectnearest_ch.map{it[1]}.collect()
+
+    output:
+    path("included_samples.txt") into included_samples_ch
+    path("included_samples.fasta") into included_fastas_ch
+
+    script:
+    """
+    cat ${fastas} > included_samples.fasta
+    cat ${fastas} | grep '>' | awk -F '>' '{print \$2}' > included_samples.txt
     """
 }
 
@@ -413,7 +434,9 @@ process assignClades {
 
     script:
     """
-    assignclades.py --reference ${ref_gb} --clades ${clades} --vcf ${vcf} --sample ${sampleName}
+    assignclades.py \
+        --reference ${ref_gb} --clades ${clades} \
+        --vcf ${vcf} --sample ${sampleName}
     """
 }
 
@@ -621,30 +644,94 @@ if (params.nextstrain_ncov != "" && params.nextstrain_sequences != "") {
     lat_longs = Channel.empty()
 }
 
-process makeNextstrainInput {
-    publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
-    stageInMode 'copy'
+process prepareSequences {
 
     input:
-    path(sample_sequences) from nextstrain_ch
     path(nextstrain_sequences) from nextstrain_sequences_ch
-    path(nextstrain_metadata_path)
 
     output:
-    path('metadata.tsv') into (nextstrain_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata, export_metadata)
-    path('sequences.fasta') into nextstrain_sequences
+    path('subsampled_sequences.fasta') into nextstrain_subsampled_ch
 
     script:
-    currdate = new java.util.Date().format('yyyy-MM-dd')
-    // Normalize the GISAID names using Nextstrain's bash script
+    if (params.subsample)
     """
-    make_nextstrain_input.py -ps ${nextstrain_sequences} -pm ${nextstrain_metadata_path} -ns ${sample_sequences} --date $currdate \
-    -r 'North America' -c USA -div 'California' -loc 'San Francisco County' -origlab 'Biohub' -sublab 'Biohub' \
-    -subdate $currdate
-
-    normalize_gisaid_fasta.sh all_sequences.fasta sequences.fasta
+    seqtk sample -s 11 ${nextstrain_sequences} ${params.subsample} > subsampled_sequences.fasta
+    seqkit faidx -r ${nextstrain_sequences} '.+Wuhan-Hu-1/2019.+' >> subsampled_sequences.fasta
     """
+    else
+    """
+    cp ${nextstrain_sequences} subsampled_sequences.fasta
+    """
+}
 
+sample_dates = params.sample_dates ? file(params.sample_dates, checkIfExists: true) : Channel.empty()
+
+if (params.sample_dates){
+    process makeDatedNextstrainInput {
+        publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
+        stageInMode 'copy'
+
+        input:
+        path(sample_sequences) from nextstrain_ch
+        path(nextstrain_sequences) from nextstrain_subsampled_ch
+        path(nextstrain_metadata_path)
+        path(included_samples) from included_samples_ch
+        path(included_fastas) from included_fastas_ch
+        path(include_file)
+        path(sample_dates)
+
+        output:
+        path('metadata.tsv') into (nextstrain_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata, export_metadata)
+        path('deduped_sequences.fasta') into nextstrain_sequences
+        path('included_sequences.txt') into nextstrain_include
+
+        script:
+        currdate = new java.util.Date().format('yyyy-MM-dd')
+        // Normalize the GISAID names using Nextstrain's bash script
+        """
+        make_nextstrain_input.py -ps ${nextstrain_sequences} -pm ${nextstrain_metadata_path} -ns ${sample_sequences} --date $currdate \
+        -r 'North America' -c USA -div 'California' -loc 'San Francisco County' -origlab 'Biohub' -sublab 'Biohub' \
+        -subdate $currdate --date_tsv ${sample_dates}
+
+        normalize_gisaid_fasta.sh all_sequences.fasta sequences.fasta
+        cat ${included_samples} ${include_file} > included_sequences.txt
+        cat ${included_fastas} >> sequences.fasta
+        seqkit rmdup sequences.fasta > deduped_sequences.fasta
+        """
+    }
+} else {
+    process makeNextstrainInput {
+        publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
+        stageInMode 'copy'
+
+        input:
+        path(sample_sequences) from nextstrain_ch
+        path(nextstrain_sequences) from nextstrain_subsampled_ch
+        path(nextstrain_metadata_path)
+        path(included_samples) from included_samples_ch
+        path(included_fastas) from included_fastas_ch
+        path(include_file)
+
+        output:
+        path('metadata.tsv') into (nextstrain_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata, export_metadata)
+        path('deduped_sequences.fasta') into nextstrain_sequences
+        path('included_sequences.txt') into nextstrain_include
+
+        script:
+        currdate = new java.util.Date().format('yyyy-MM-dd')
+        // Normalize the GISAID names using Nextstrain's bash script
+        """
+        make_nextstrain_input.py -ps ${nextstrain_sequences} -pm ${nextstrain_metadata_path} -ns ${sample_sequences} --date $currdate \
+        -r 'North America' -c USA -div 'California' -loc 'San Francisco County' -origlab 'Biohub' -sublab 'Biohub' \
+        -subdate $currdate
+
+        normalize_gisaid_fasta.sh all_sequences.fasta sequences.fasta
+        cat ${included_samples} ${include_file} > included_sequences.txt
+        cat ${included_fastas} >> sequences.fasta
+        seqkit rmdup sequences.fasta > deduped_sequences.fasta
+        """
+
+    }
 }
 
 process filterStrains {
@@ -654,7 +741,7 @@ process filterStrains {
     input:
     path(sequences) from nextstrain_sequences
     path(metadata) from nextstrain_metadata
-    path(include_file)
+    path(include_file) from nextstrain_include
     path(exclude_file)
 
     output:
@@ -670,11 +757,8 @@ process filterStrains {
             --exclude ${exclude_file} \
             --exclude-where ${exclude_where} \
             --min-length ${params.minLength} \
-            --group-by division year month \
-            --sequences-per-group 300 \
             --output filtered.fasta
     """
-
 }
 
 process alignSequences {
@@ -905,25 +989,27 @@ process exportData {
 }
 
 process multiqc {
-	publishDir "${params.outdir}/MultiQC", mode: 'copy'
+    publishDir "${params.outdir}/MultiQC", mode: 'copy'
 
-   input:
-   path(trim_galore_results) from trimmed_reports.collect().ifEmpty([])
-   path("quast_results/*/*") from multiqc_quast.collect()
-   path(samtools_stats) from samtools_stats_out.collect()
-   path(multiqc_config)
-   path(bcftools_stats) from bcftools_stats_ch.collect().ifEmpty([])
-   path(primer_stats) from primer_stats_ch.collect().ifEmpty([])
-   path(nearest_realigned) from nearest_realigned_stats.collect().ifEmpty([])
+    input:
+    path(trim_galore_results) from trimmed_reports.collect().ifEmpty([])
+    path("quast_results/*/*") from multiqc_quast.collect()
+    path(samtools_stats) from samtools_stats_out.collect()
+    path(multiqc_config)
+    path(bcftools_stats) from bcftools_stats_ch.collect().ifEmpty([])
+    path(primer_stats) from primer_stats_ch.collect().ifEmpty([])
+    path(nearest_realigned) from nearest_realigned_stats.collect().ifEmpty([])
 
-   output:
-   path("*multiqc_report.html")
-   path("*_data")
-   path("multiqc_plots")
+    output:
+    path("*multiqc_report.html")
+    path("*_data")
+    path("multiqc_plots")
 
-	script:
-	"""
-	multiqc -f -ip --config ${multiqc_config} ${trim_galore_results} \
-      ${samtools_stats} quast_results/ ${bcftools_stats} ${primer_stats} ${nearest_realigned}
-	"""
+    // TODO: add trim_galore results (currently breaking for empty fastqs?)
+    script:
+    """
+    multiqc -f -ip --config ${multiqc_config} \
+        ${samtools_stats} quast_results/ ${bcftools_stats} \
+        ${primer_stats} ${nearest_realigned} ${trim_galore_results}
+    """
 }
