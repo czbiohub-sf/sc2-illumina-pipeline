@@ -395,7 +395,7 @@ if (params.sample_metadata) {
       output:
       path('metadata.tsv') into (nextstrain_metadata, firstfilter_metadata, extractsamples_metadata, priorities_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata, export_metadata)
       path('deduped_sequences.fasta') into (nextstrain_in, firstfilter_in)
-      path('included_sequences.txt') into nextstrain_include
+      path('included_sequences.txt') into (nextstrain_include, firstfilter_include)
       path("internal_samples.txt") into sample_ids
       path("external_samples.txt") into external_ids
       path("all_sequences.fasta")
@@ -409,6 +409,7 @@ if (params.sample_metadata) {
       cat included_nearest.txt ${include_file} > included_sequences.txt
       cat normalized_sequences.fasta | grep '>' | awk -F '>' '{print \$2}' > external_samples.txt
       cat ${sample_sequences} | grep '>' | awk -F '>' '{print \$2}' > internal_samples.txt
+      cat internal_samples.txt >> included_sequences.txt
       seqkit rmdup normalized_sequences.fasta > sequences.fasta
 
       make_nextstrain_input.py --prev_metadata ${nextstrain_metadata_path} \
@@ -435,7 +436,7 @@ else {
       output:
       path('metadata.tsv') into (nextstrain_metadata, firstfilter_metadata, extractsamples_metadata, priorities_metadata, refinetree_metadata, infertraits_metadata, tipfreq_metadata, export_metadata)
       path('deduped_sequences.fasta') into firstfilter_in
-      path('included_sequences.txt') into nextstrain_include
+      path('included_sequences.txt') into (nextstrain_include, firstfilter_include)
       path("internal_samples.txt") into sample_ids
       path("external_samples.txt") into external_ids
       path("all_sequences.fasta")
@@ -450,6 +451,7 @@ else {
       cat included_nearest.txt ${include_file} > included_sequences.txt
       cat normalized_sequences.fasta | grep '>' | awk -F '>' '{print \$2}' > external_samples.txt
       cat ${sample_sequences} | grep '>' | awk -F '>' '{print \$2}' > internal_samples.txt
+      cat internal_samples.txt >> included_sequences.txt
       seqkit rmdup normalized_sequences.fasta > sequences.fasta
 
       make_nextstrain_input.py --prev_sequences sequences.fasta \
@@ -477,7 +479,7 @@ process firstFilter {
   path(sequences) from firstfilter_in
   path(metadata) from firstfilter_metadata
   path(exclude_file)
-  path(include_file)
+  path(include_file) from firstfilter_include
 
   output:
   path("filtered_sequences.fasta") into firstfiltered_ch
