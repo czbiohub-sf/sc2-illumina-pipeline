@@ -409,6 +409,7 @@ if (params.sample_metadata) {
       cat included_nearest.txt ${include_file} > included_sequences.txt
       cat normalized_sequences.fasta | grep '>' | awk -F '>' '{print \$2}' > external_samples.txt
       cat ${sample_sequences} | grep '>' | awk -F '>' '{print \$2}' > internal_samples.txt
+      cat internal_samples.txt >> included_sequences.txt
       seqkit rmdup normalized_sequences.fasta > sequences.fasta
 
       make_nextstrain_input.py --prev_metadata ${nextstrain_metadata_path} \
