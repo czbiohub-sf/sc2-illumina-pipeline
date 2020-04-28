@@ -1,0 +1,5 @@
+sample_name	depth_avg	mapped_reads	total_reads	n_actg	n_missing	n_gap	n_ambiguous	ref_snps	ref_mnps	ref_indels	depth_q.25	depth_q.5	depth_q.75	depth_frac_above_10x	depth_frac_above_25x	depth_frac_above_50x	depth_frac_above_100x	mapped_paired	paired_inward	paired_outward	paired_other_orientation	ercc_mapped_reads	ercc_mapped_paired
+RR057_012_NSaR1b_S44_subsampled	0.067	15	349912	0	19092	0	0	0	0	0	0.000	0.000	0.000	0.000	0.000	0.000	0.000	15	14	0	0	4044	3980
+RR057_013_NSaR1b_S45_subsampled	116.780	26075	354020	29858	5	0	0	7	0	0	75.000	101.000	136.000	0.998	0.993	0.993	0.514	25950	22288	3484	18	1900	1876
+RR057_031_waR1a_S31_subsampled	0.000	0	3244	0	0	0	0	0	0	0	0.000	0.000	0.000	0.000	0.000	0.000	0.000	0	0	0	0	2976	2924
+RR_water_ntc_SEQ003_O22_S358	0.000	0	4326	0	0	0	0	0	0	0	0.000	0.000	0.000	0.000	0.000	0.000	0.000	0	0	0	0	2807	2780
