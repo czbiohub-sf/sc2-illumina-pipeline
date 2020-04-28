@@ -19,6 +19,7 @@ def helpMessage() {
       --sample_metadata             TSV of metadata from main output
       --clades                      TSV with clades from nextstrain (default: data/clades.tsv)
       --sample_vcfs                 Glob pattern of corresponding VCF files
+      --intrahost_variants          Detect intrahost variants
 
 
     Nextstrain options:
