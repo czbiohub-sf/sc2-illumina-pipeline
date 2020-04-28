@@ -16,6 +16,7 @@ parser.add_argument("--sample_name")
 parser.add_argument("--cleaned_bam")
 parser.add_argument("--assembly")
 parser.add_argument("--samtools_stats")
+parser.add_argument("--ercc_stats")
 parser.add_argument("--vcf", help="reference SNPs")
 parser.add_argument("--primervcf")
 parser.add_argument("--neighborvcf")
@@ -88,6 +89,18 @@ if args.samtools_stats:
                 elif matched.group(1) == "pairs with other orientation":
                     stats["paired_other_orientation"] = int(matched.group(2)) * 2
                 # TODO: number of discordant read pairs
+
+if args.ercc_stats:
+    with open(args.ercc_stats) as f:
+        ercc_stats_re = re.compile(r"SN\s+([^\s].*):\s+(\d+)")
+        for line in f:
+            matched = ercc_stats_re.match(line)
+            if matched:
+                if matched.group(1) == "reads mapped":
+                    stats["ercc_mapped_reads"] = int(matched.group(2))
+                elif matched.group(1) == "reads mapped and paired":
+                    stats["ercc_mapped_paired"] = int(matched.group(2))
+
 
 def countVCF(vcf_file, snpcol, mnpcol, indelcol, statsdict):
     vcf = pysam.VariantFile(vcf_file)

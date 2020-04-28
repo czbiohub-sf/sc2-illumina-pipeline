@@ -22,6 +22,7 @@ def helpMessage() {
       --maxNs                       Max number of Ns to allow assemblies to pass QC
       --minLength                   Minimum base pair length to allow assemblies to pass QC
       --no_reads_quast              Run QUAST without aligning reads
+      --ercc_fasta                  Default: data/ercc_sequences.fasta
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -69,7 +70,7 @@ if (params.readPaths) {
 exclude_samples = params.exclude_samples.split(",")
 reads_ch = reads_ch.filter { !exclude_samples.contains(it[0]) }
 
-reads_ch.into { unaligned_reads; stats_reads; }
+reads_ch.into { unaligned_reads; stats_reads; ercc_in}
 reads_ch = unaligned_reads
 
 if (params.kraken2_db == "") {
@@ -81,6 +82,27 @@ if (params.kraken2_db == "") {
     kraken2_reads_in = reads_ch
     reads_ch = Channel.empty()
     kraken2_db = file(params.kraken2_db, checkIfExists: true)
+}
+
+ercc_fasta = file(params.ercc_fasta, checkIfExists: true)
+
+process quantifyERCCs {
+  tag {sampleName}
+  publishDir "${params.outdir}/ercc-stats", mode: 'copy'
+
+  input:
+  path(ercc_fasta)
+  tuple(sampleName, path(reads)) from ercc_in
+
+  output:
+  tuple(sampleName, path("${sampleName}.ercc_stats")) into ercc_out
+
+  script:
+  """
+  minimap2 -ax sr ${ercc_fasta} ${reads} |
+    samtools view -bo ercc_mapped.bam
+  samtools stats ercc_mapped.bam > ${sampleName}.ercc_stats
+  """
 }
 
 process filterReads {
@@ -326,6 +348,7 @@ process callVariants {
 stats_reads
     .join(stats_bam)
     .join(stats_fa)
+    .join(ercc_out)
     .join(variants_ch)
     .set { stats_ch_in }
 
@@ -339,6 +362,7 @@ process computeStats {
           file(reads),
           file(trimmed_filtered_bam),
           file(in_fa),
+          file(ercc_stats),
           file(vcf)) from stats_ch_in
 
     output:
@@ -353,6 +377,7 @@ process computeStats {
     alignment_assembly_stats.py \
         --sample_name ${sampleName} \
         --cleaned_bam ${trimmed_filtered_bam} \
+        --ercc_stats ${ercc_stats} \
         --samtools_stats ${sampleName}.samtools_stats \
         --assembly ${in_fa} \
         --vcf ${vcf} \
