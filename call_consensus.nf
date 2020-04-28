@@ -362,7 +362,7 @@ process computeStats {
           file(reads),
           file(trimmed_filtered_bam),
           file(in_fa),
-          file(ercc_stats), from stats_ch_in,
+          file(ercc_stats),
           file(vcf)) from stats_ch_in
 
     output:
