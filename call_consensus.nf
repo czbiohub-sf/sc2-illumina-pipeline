@@ -395,7 +395,7 @@ process mergeAllAssemblies {
 }
 
 process mergeAssemblyStats {
-    publishDir "${params.outdir}", mode: 'copy'
+    publishDir "${params.outdir}/call_consensus-stats", mode: 'copy'
 
     input:
     path(in_json) from stats_ch.collect()
@@ -410,7 +410,8 @@ process mergeAssemblyStats {
 }
 
 process filterAssemblies {
-    publishDir "${params.outdir}", mode: 'copy'
+    publishDir "${params.outdir}", mode: 'copy',
+      saveAs: {x -> x.endsWith(".tsv") ? "call_consensus-stats/$x" : x}
 
     input:
     path(merged_stats) from merged_stats_ch
