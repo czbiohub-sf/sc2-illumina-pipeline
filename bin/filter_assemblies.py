@@ -35,9 +35,10 @@ def filtered_seqs():
 
 SeqIO.write(filtered_seqs(), args.out_prefix + ".fa", "fasta")
 
-with open(args.out_prefix + ".vcf", "w") as f:
-    subprocess.run(["bcftools", "view",
-                    "-s", ",".join(samples_to_keep),
-                    "-c", "1",
-                    args.vcf],
-                   stdout=f)
+if args.vcf:
+    with open(args.out_prefix + ".vcf", "w") as f:
+        subprocess.run(["bcftools", "view",
+                        "-s", ",".join(samples_to_keep),
+                        "-c", "1",
+                        args.vcf],
+                       stdout=f)

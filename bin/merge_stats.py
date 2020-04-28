@@ -6,7 +6,23 @@ import collections
 import pandas as pd
 
 rows = []
-for fname in sys.argv[1:]:
+
+if sys.argv[1] == 'core':
+    col_keys = ["sample_name", "depth_avg", "mapped_reads",
+                "total_reads", "n_actg", "n_missing", "n_gap",
+                "n_ambiguous",
+                "ref_snps", "ref_mnps", "ref_indels"]
+elif sys.argv[1] == 'analysis':
+    col_keys = ["sample_name", "clade", "n_actg", "n_missing", "n_gap",
+                "n_ambiguous", "nearest_sequence",
+                "ref_snps", "ref_mnps", "ref_indels"]
+elif sys.argv[1] == 'all':
+    col_keys = ["sample_name", "clade", "depth_avg", "mapped_reads",
+                "total_reads", "n_actg", "n_missing", "n_gap",
+                "n_ambiguous", "nearest_sequence",
+                "new_snps", "new_mnps", "new_indels"]
+
+for fname in sys.argv[2:]:
     with open(fname) as f:
         row = json.load(f)
     allele_counts = collections.Counter()
@@ -16,14 +32,11 @@ for fname in sys.argv[1:]:
     row["n_missing"] = allele_counts["N"]
     row["n_gap"] = allele_counts["-"]
     row["n_ambiguous"] = sum(v for k, v in allele_counts.items() if k not in "ACTGUN-")
-    row["clade"] = ";".join(row["clade"])
+    if (sys.argv[1] == 'analysis') or (sys.argv[1] == 'all'):
+        row["clade"] = ";".join(row["clade"])
 
     reordered_row = {}
-    for key in [
-            "sample_name", "clade", "depth_avg", "mapped_reads",
-            "total_reads", "n_actg", "n_missing", "n_gap",
-            "n_ambiguous", "nearest_sequence",
-            "new_snps", "new_mnps", "new_indels"]:
+    for key in col_keys:
         reordered_row[key] = row.pop(key)
     reordered_row.update(row)
     rows.append(reordered_row)
