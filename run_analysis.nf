@@ -7,7 +7,7 @@ def helpMessage() {
     Mandatory arguments:
       -profile                      Configuration profile to use. Can use multiple (comma separated)
                                     Available: conda, docker, singularity, awsbatch, test and more.
-      --sample_sequences            Glob patterns of sequences
+      --sample_sequences            Glob pattern of sequences
       --ref                         Reference FASTA file (default: data/MN908947.3.fa)
       --ref_gb                      Reference Genbank file for augur (default: data/MN908947.3.gb)
       --blast_sequences             FASTA of sequences for BLAST alignment
@@ -18,6 +18,8 @@ def helpMessage() {
     Optional arguments:
       --sample_metadata             TSV of metadata from main output
       --clades                      TSV with clades from nextstrain (default: data/clades.tsv)
+      --sample_vcfs                 Glob pattern of corresponding VCF files
+
 
     Nextstrain options:
       --nextstrain_ncov             Path to nextstrain/ncov directory (default: fetches from github)
@@ -82,7 +84,16 @@ process realignConsensus {
 realigned_bam.into { call_variants_bam; combined_variants_bams }
 combined_variants_bams = combined_variants_bams.map { it[1] }.collect()
 
-process callVariants {
+// Allow VCF files to be optional in case we want to include assemblies that aren't produced by the core
+// consensus calling pipeline
+if (params.sample_vcfs) {
+  Channel
+    .fromPath(params.sample_vcfs)
+    .map {file -> tuple(file.simpleName, file) }
+    .set {variants_ch}
+} 
+else {
+  process callVariants {
     tag { sampleName }
     publishDir "${params.outdir}/sample-variants", mode: 'copy'
 
@@ -101,6 +112,7 @@ process callVariants {
       > ${sampleName}.vcf
     bcftools stats ${sampleName}.vcf > ${sampleName}.bcftools_stats
     """
+  }
 }
 
 variants_ch.into {primer_variants_ch; assignclades_in; variants_ch}
