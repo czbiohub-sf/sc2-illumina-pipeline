@@ -23,6 +23,7 @@ def helpMessage() {
       --minLength                   Minimum base pair length to allow assemblies to pass QC
       --no_reads_quast              Run QUAST without aligning reads
       --ercc_fasta                  Default: data/ercc_sequences.fasta
+      --keep_ambiguous              Keep reads where only 1 mate is mapped in calling consensus
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -234,10 +235,11 @@ process trimPrimers {
     path(primer_bed)
 
     output:
-    tuple(sampleName, file("${sampleName}.primertrimmed.bam")) into trimmed_bam_ch;
+    tuple(sampleName, file("${sampleName}.primertrimmed.bam")) into trimmed_bam_ch
     file("${sampleName}.primertrimmed.bam.bai")
 
     script:
+    if (!params.keep_ambiguous)
     """
     samtools view -F4 -q ${params.samQualThreshold} -o ivar.bam ${alignment}
     samtools index ivar.bam
@@ -246,9 +248,35 @@ process trimPrimers {
     samtools view -f 1 -F 12 -bo ${sampleName}.primertrimmed.bam ${sampleName}.primertrimmed.unfiltered.bam
     samtools index ${sampleName}.primertrimmed.bam
     """
+    else
+    """
+    samtools view -F4 -q ${params.samQualThreshold} -o ivar.bam ${alignment}
+    samtools index ivar.bam
+    ivar trim -e -i ivar.bam -b ${primer_bed} -p ivar.out
+    samtools sort -O bam -o ${sampleName}.primertrimmed.bam ivar.out.bam
+    samtools index ${sampleName}.primertrimmed.bam
+    """
 }
 
-trimmed_bam_ch.into { quast_bam; consensus_bam; stats_bam; intrahost_bam }
+trimmed_bam_ch.into { quast_bam; consensus_bam; stats_bam; intrahost_bam; extractsc2_bam }
+
+process extractSC2 {
+  tag {sampleName}
+  publishDir "${params.outdir}/sc2-reads", mode: 'copy'
+
+  input:
+  tuple(sampleName, path(bam)) from extractsc2_bam
+
+  output:
+  path("${sampleName}_sc2*.fq.gz")
+
+  script:
+  """
+  samtools fastq -1 ${sampleName}_sc2_1.fq.gz -2 ${sampleName}_sc2_2.fq.gz \
+    -f 1 -F 12 -0 /dev/null -s /dev/null -n -c 6 -@ ${task.cpus-1}\
+    ${bam}
+  """
+}
 
 if (!params.intrahost_variants) {
     intrahost_bam = Channel.empty()
