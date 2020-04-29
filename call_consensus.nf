@@ -295,8 +295,9 @@ process makeConsensus {
 
   script:
   """
-        samtools index ${bam}
-  samtools mpileup -A -d ${params.mpileupDepth} -Q0 ${bam} |
+  samtools view -f 1 -F 12 -bo filtered.bam ${bam}
+  samtools index filtered.bam
+  samtools mpileup -A -d ${params.mpileupDepth} -Q0 filtered.bam |
     ivar consensus -q ${params.ivarQualThreshold} -t ${params.ivarFreqThreshold} -m ${params.minDepth} -n N -p ${sampleName}.primertrimmed.consensus
         echo '>${sampleName}' > ${sampleName}.consensus.fa
         seqtk seq -l 50 ${sampleName}.primertrimmed.consensus.fa | tail -n +2 >> ${sampleName}.consensus.fa
