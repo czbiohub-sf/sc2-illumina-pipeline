@@ -1,0 +1,4 @@
+sample_name	clade	n_actg	n_missing	n_gap	n_ambiguous	nearest_sequence	ref_snps	ref_mnps	ref_indels	primer_snps	primer_mnps	primer_indels
+nextstrain_sample1	A2	29897	4	0	0	Wuhan-Hu-1/2019	9	0	0	0	0	0
+nextstrain_sample2	unknown	3050	26786	0	0	MN908947.3	0	0	0	0	0	0
+nextstrain_sample3	A2	29841	30	0	0	Wuhan/WIV04/2019	9	0	0	0	0	0

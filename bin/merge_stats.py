@@ -41,4 +41,7 @@ for fname in sys.argv[2:]:
     reordered_row.update(row)
     rows.append(reordered_row)
 
-pd.DataFrame(rows).to_csv(sys.stdout, index=False, sep="\t", float_format="%.3f")
+(pd
+ .DataFrame(rows)
+ .sort_values("sample_name")
+ .to_csv(sys.stdout, index=False, sep="\t", float_format="%.3f"))
