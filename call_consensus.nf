@@ -242,7 +242,8 @@ process trimPrimers {
     samtools view -F4 -q ${params.samQualThreshold} -o ivar.bam ${alignment}
     samtools index ivar.bam
     ivar trim -e -i ivar.bam -b ${primer_bed} -p ivar.out
-    samtools sort -O bam -o ${sampleName}.primertrimmed.bam ivar.out.bam
+    samtools sort -O bam -o ${sampleName}.primertrimmed.unfiltered.bam ivar.out.bam
+    samtools view -f 1 -F 12 -bo ${sampleName}.primertrimmed.unfiltered.bam ${sampleName}.primertrimmed.bam
     samtools index ${sampleName}.primertrimmed.bam
     """
 }
@@ -295,9 +296,8 @@ process makeConsensus {
 
   script:
   """
-  samtools view -f 1 -F 12 -bo filtered.bam ${bam}
-  samtools index filtered.bam
-  samtools mpileup -A -d ${params.mpileupDepth} -Q0 filtered.bam |
+  samtools index ${bam}
+  samtools mpileup -A -d ${params.mpileupDepth} -Q0 ${bam} |
     ivar consensus -q ${params.ivarQualThreshold} -t ${params.ivarFreqThreshold} -m ${params.minDepth} -n N -p ${sampleName}.primertrimmed.consensus
         echo '>${sampleName}' > ${sampleName}.consensus.fa
         seqtk seq -l 50 ${sampleName}.primertrimmed.consensus.fa | tail -n +2 >> ${sampleName}.consensus.fa
