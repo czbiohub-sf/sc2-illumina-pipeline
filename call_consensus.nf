@@ -239,16 +239,6 @@ process trimPrimers {
     file("${sampleName}.primertrimmed.bam.bai")
 
     script:
-    if (!params.keep_ambiguous)
-    """
-    samtools view -F4 -q ${params.samQualThreshold} -o ivar.bam ${alignment}
-    samtools index ivar.bam
-    ivar trim -e -i ivar.bam -b ${primer_bed} -p ivar.out
-    samtools sort -O bam -o ${sampleName}.primertrimmed.unfiltered.bam ivar.out.bam
-    samtools view -f 1 -F 12 -bo ${sampleName}.primertrimmed.bam ${sampleName}.primertrimmed.unfiltered.bam
-    samtools index ${sampleName}.primertrimmed.bam
-    """
-    else
     """
     samtools view -F4 -q ${params.samQualThreshold} -o ivar.bam ${alignment}
     samtools index ivar.bam
@@ -323,9 +313,19 @@ process makeConsensus {
   tuple(sampleName, path("${sampleName}.consensus.fa")) into (consensus_fa, quast_ch)
 
   script:
+  if (params.keep_ambiguous)
   """
   samtools index ${bam}
   samtools mpileup -A -d ${params.mpileupDepth} -Q0 ${bam} |
+    ivar consensus -q ${params.ivarQualThreshold} -t ${params.ivarFreqThreshold} -m ${params.minDepth} -n N -p ${sampleName}.primertrimmed.consensus
+        echo '>${sampleName}' > ${sampleName}.consensus.fa
+        seqtk seq -l 50 ${sampleName}.primertrimmed.consensus.fa | tail -n +2 >> ${sampleName}.consensus.fa
+  """
+  else
+  """
+  samtools view -f 1 -F 12 -bo filtered.bam ${bam}
+  samtools index filtered.bam
+  samtools mpileup -A -d ${params.mpileupDepth} -Q0 filtered.bam |
     ivar consensus -q ${params.ivarQualThreshold} -t ${params.ivarFreqThreshold} -m ${params.minDepth} -n N -p ${sampleName}.primertrimmed.consensus
         echo '>${sampleName}' > ${sampleName}.consensus.fa
         seqtk seq -l 50 ${sampleName}.primertrimmed.consensus.fa | tail -n +2 >> ${sampleName}.consensus.fa
