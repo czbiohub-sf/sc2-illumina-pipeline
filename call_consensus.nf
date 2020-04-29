@@ -243,7 +243,7 @@ process trimPrimers {
     samtools index ivar.bam
     ivar trim -e -i ivar.bam -b ${primer_bed} -p ivar.out
     samtools sort -O bam -o ${sampleName}.primertrimmed.unfiltered.bam ivar.out.bam
-    samtools view -f 1 -F 12 -bo ${sampleName}.primertrimmed.unfiltered.bam ${sampleName}.primertrimmed.bam
+    samtools view -f 1 -F 12 -bo ${sampleName}.primertrimmed.bam ${sampleName}.primertrimmed.unfiltered.bam
     samtools index ${sampleName}.primertrimmed.bam
     """
 }
