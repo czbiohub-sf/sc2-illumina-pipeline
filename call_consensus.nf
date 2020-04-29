@@ -262,9 +262,9 @@ process extractSC2 {
 
   script:
   """
+  samtools sort -n ${bam} |
   samtools fastq -1 ${sampleName}_sc2_1.fq.gz -2 ${sampleName}_sc2_2.fq.gz \
-    -f 1 -F 12 -0 /dev/null -s /dev/null -n -c 6 -@ ${task.cpus-1}\
-    ${bam}
+    -f 1 -F 12 -0 /dev/null -s /dev/null -n -c 6 -@ ${task.cpus-1}
   """
 }
 
