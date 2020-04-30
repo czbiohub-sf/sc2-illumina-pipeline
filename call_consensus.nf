@@ -23,7 +23,7 @@ def helpMessage() {
       --minLength                   Minimum base pair length to allow assemblies to pass QC
       --no_reads_quast              Run QUAST without aligning reads
       --ercc_fasta                  Default: data/ercc_sequences.fasta
-      --host_fasta                  Default: fetches from NCBI (ftp://ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/reference/human_g1k_v37.fasta.gz)
+      --host_fasta                  Set to false if skipping host filtering (default: fetches from NCBI ftp://ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/reference/human_g1k_v37.fasta.gz)
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -71,19 +71,24 @@ if (params.readPaths) {
 exclude_samples = params.exclude_samples.split(",")
 reads_ch = reads_ch.filter { !exclude_samples.contains(it[0]) }
 
-reads_ch.into { unaligned_reads; stats_reads; ercc_in}
-reads_ch = unaligned_reads
+reads_ch.into {reads_ch; total_reads}
+
+if (!params.host_fasta) {
+  reads_ch.into { unaligned_reads; stats_reads; ercc_in}
+  reads_ch = unaligned_reads
+}
 
 if (params.kraken2_db == "") {
     // skip kraken
     kraken2_reads_in = Channel.empty()
     kraken2_db = Channel.empty()
 } else {
-    // send reads to kraken, and empty the reads channel
     if (params.host_fasta) {
       hostfilter_in = reads_ch
       reads_ch = Channel.empty()
-    } else {
+    }
+    // send reads to kraken, and empty the reads channel 
+    else {
       hostfilter_in = Channel.empty()
       kraken2_reads_in = reads_ch
       reads_ch = Channel.empty()
@@ -91,18 +96,22 @@ if (params.kraken2_db == "") {
     kraken2_db = file(params.kraken2_db, checkIfExists: true)
 }
 
-host_fasta = file(params.host_fasta, checkIfExists: true)
+host_fasta = params.host_fasta ? file(params.host_fasta, checkIfExists: true) : Channel.empty()
 
 process filterHost {
   tag {sampleName}
   label 'process_large'
+  publishDir "${params.outdir}/host-filtered-reads", mode: 'copy'
 
   input:
   path(host_fasta)
   tuple(sampleName, path(reads)) from hostfilter_in
 
   output:
-  tuple(sampleName, path("${sampleName}_clean*.fastq.gz")) into kraken2_reads_in
+  tuple(sampleName, path("${sampleName}_clean*.fastq.gz")) into hostfilter_out
+
+  when:
+  params.host_fasta
 
   script:
   """
@@ -112,6 +121,10 @@ process filterHost {
      -1 ${sampleName}_clean_1.fastq.gz -2 ${sampleName}_clean_2.fastq.gz unmapped.bam
   """
 
+}
+
+if (params.host_fasta) {
+  hostfilter_out.into {kraken2_reads_in; stats_reads; ercc_in}
 }
 
 ercc_fasta = file(params.ercc_fasta, checkIfExists: true)
@@ -409,12 +422,13 @@ process callVariants {
     """
 }
 
-stats_reads
-    .join(stats_bam)
-    .join(stats_fa)
-    .join(ercc_out)
-    .join(variants_ch)
-    .set { stats_ch_in }
+total_reads
+  .join(stats_reads)
+  .join(stats_bam)
+  .join(stats_fa)
+  .join(ercc_out)
+  .join(variants_ch)
+  .set { stats_ch_in }
 
 process computeStats {
     tag { sampleName }
@@ -424,6 +438,7 @@ process computeStats {
     input:
     tuple(sampleName,
           file(reads),
+          file(filtered_reads),
           file(trimmed_filtered_bam),
           file(in_fa),
           file(ercc_stats),
@@ -446,7 +461,8 @@ process computeStats {
         --assembly ${in_fa} \
         --vcf ${vcf} \
         --out_prefix ${sampleName} \
-        --reads ${reads}
+        --reads ${reads} \
+        --filtered_reads ${filtered_reads}
     """
 }
 

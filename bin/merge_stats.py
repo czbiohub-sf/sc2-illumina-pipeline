@@ -9,7 +9,7 @@ rows = []
 
 if sys.argv[1] == 'core':
     col_keys = ["sample_name", "depth_avg", "mapped_reads",
-                "total_reads", "n_actg", "n_missing", "n_gap",
+                "total_reads", "host_filtered_reads", "n_actg", "n_missing", "n_gap",
                 "n_ambiguous",
                 "ref_snps", "ref_mnps", "ref_indels"]
 elif sys.argv[1] == 'analysis':
@@ -18,7 +18,7 @@ elif sys.argv[1] == 'analysis':
                 "ref_snps", "ref_mnps", "ref_indels"]
 elif sys.argv[1] == 'all':
     col_keys = ["sample_name", "clade", "depth_avg", "mapped_reads",
-                "total_reads", "n_actg", "n_missing", "n_gap",
+                "total_reads", "host_filtered_reads", "n_actg", "n_missing", "n_gap",
                 "n_ambiguous", "nearest_sequence",
                 "new_snps", "new_mnps", "new_indels"]
 

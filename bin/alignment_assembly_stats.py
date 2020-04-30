@@ -24,6 +24,7 @@ parser.add_argument("--neighborfasta")
 parser.add_argument("--clades")
 parser.add_argument("--out_prefix")
 parser.add_argument("--reads", nargs="+")
+parser.add_argument("--filtered_reads", nargs="+")
 args = parser.parse_args()
 
 stats = {"sample_name": args.sample_name}
@@ -71,6 +72,10 @@ if args.reads:
     fq_lines = subprocess.run(" ".join(["zcat"] + list(args.reads)) + " | wc -l",
                               shell=True, stdout=subprocess.PIPE).stdout
     stats["total_reads"] = int(int(fq_lines) / 4)
+if args.filtered_reads:
+    fq_lines = subprocess.run(" ".join(["zcat"] + list(args.filtered_reads)) + " | wc -l",
+                              shell=True, stdout=subprocess.PIPE).stdout
+    stats["host_filtered_reads"] = int(int(fq_lines) / 4)
 
 if args.samtools_stats:
     with open(args.samtools_stats) as f:
