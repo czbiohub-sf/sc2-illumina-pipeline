@@ -82,12 +82,13 @@ if (params.kraken2_db == "") {
     // send reads to kraken, and empty the reads channel
     if (params.host_fasta) {
       hostfilter_in = reads_ch
+      reads_ch = Channel.empty()
     } else {
       hostfilter_in = Channel.empty()
       kraken2_reads_in = reads_ch
       reads_ch = Channel.empty()
-      kraken2_db = file(params.kraken2_db, checkIfExists: true)
     }
+    kraken2_db = file(params.kraken2_db, checkIfExists: true)
 }
 
 host_fasta = file(params.host_fasta, checkIfExists: true)
