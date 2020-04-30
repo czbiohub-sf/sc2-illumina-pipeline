@@ -23,6 +23,7 @@ def helpMessage() {
       --minLength                   Minimum base pair length to allow assemblies to pass QC
       --no_reads_quast              Run QUAST without aligning reads
       --ercc_fasta                  Default: data/ercc_sequences.fasta
+      --host_fasta                  Default: fetches from NCBI (ftp://ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/reference/human_g1k_v37.fasta.gz)
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -79,9 +80,37 @@ if (params.kraken2_db == "") {
     kraken2_db = Channel.empty()
 } else {
     // send reads to kraken, and empty the reads channel
-    kraken2_reads_in = reads_ch
-    reads_ch = Channel.empty()
-    kraken2_db = file(params.kraken2_db, checkIfExists: true)
+    if (params.host_fasta) {
+      hostfilter_in = reads_ch
+    } else {
+      hostfilter_in = Channel.empty()
+      kraken2_reads_in = reads_ch
+      reads_ch = Channel.empty()
+      kraken2_db = file(params.kraken2_db, checkIfExists: true)
+    }
+}
+
+host_fasta = file(params.host_fasta, checkIfExists: true)
+
+process filterHost {
+  tag {sampleName}
+  label 'process_large'
+
+  input:
+  path(host_fasta)
+  tuple(sampleName, path(reads)) from hostfilter_in
+
+  output:
+  tuple(sampleName, path("${sampleName}_clean*.fastq.gz")) into kraken2_reads_in
+
+  script:
+  """
+  minimap2 -ax sr ${host_fasta} ${reads} -t ${task.cpus} |
+    samtools sort -n -O bam -@ ${task.cpus-1} -o unmapped.bam
+    samtools fastq -f 12 -c 6 -n -@ ${task.cpus-1} \
+     -1 ${sampleName}_clean_1.fastq.gz -2 ${sampleName}_clean_2.fastq.gz unmapped.bam
+  """
+
 }
 
 ercc_fasta = file(params.ercc_fasta, checkIfExists: true)
