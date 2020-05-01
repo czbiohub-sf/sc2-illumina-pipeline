@@ -492,7 +492,6 @@ process alignSequences {
   label "process_large"
   publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
-
   input:
   path(sequences) from firstfiltered_ch
   path(ref_gb)
@@ -512,7 +511,7 @@ process alignSequences {
             --nthreads ${task.cpus} \
             --remove-reference \
             --fill-gaps \
-            --existing-alignment ${params.existing_alignment}
+            --existing-alignment ${existing_alignment}
   """
   else
   """
