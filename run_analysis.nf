@@ -337,7 +337,7 @@ process filterAssemblies {
     """
 }
 
-nextstrain_ch.into {nextstrain_ch, sample_sequences_ch}
+nextstrain_ch.into {nextstrain_ch; sample_sequences_ch}
 // Setup nextstrain files
 
 if (params.nextstrain_sequences && params.nextstrain_ncov) {
@@ -508,7 +508,7 @@ process alignSequences {
   augur align \
             --sequences ${sample_sequences} \
             --reference-sequence ${ref_gb} \
-            --output aligned_sequences.fasta \
+            --output aligned_raw.fasta \
             --nthreads ${task.cpus} \
             --remove-reference \
             --fill-gaps \
@@ -519,7 +519,7 @@ process alignSequences {
   augur align \
             --sequences ${sequences} \
             --reference-sequence ${ref_gb} \
-            --output aligned_sequences.fasta \
+            --output aligned_raw.fasta \
             --nthreads ${task.cpus} \
             --remove-reference \
             --fill-gaps
