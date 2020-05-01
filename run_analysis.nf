@@ -497,7 +497,7 @@ process alignSequences {
   path(sequences) from firstfiltered_ch
   path(ref_gb)
   path(existing_alignment)
-  path(sample_sequences) from sample_sequences_in
+  path(sample_sequences) from sample_sequences_ch
 
   output:
   path("aligned_sequences.fasta") into (firstaligned_ch, makepriorities_ch, filterstrains_in)
