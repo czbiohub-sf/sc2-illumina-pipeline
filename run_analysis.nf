@@ -661,7 +661,7 @@ process refineTree {
         --divergence-unit mutations \
         --date-confidence \
         --no-covariance \
-        --keep-polytomies
+        --clock-filter-iqd 4
     """
 }
 
