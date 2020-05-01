@@ -599,6 +599,7 @@ process buildTree {
 
 process refineTree {
     publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
+    echo true
 
     input:
     path(tree) from tree_raw_ch
@@ -626,7 +627,7 @@ process refineTree {
         --divergence-unit mutations \
         --date-confidence \
         --no-covariance \
-        --clock-filter-iqd 4
+        --keep-polytomies
     """
 }
 
