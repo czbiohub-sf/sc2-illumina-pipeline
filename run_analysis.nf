@@ -633,7 +633,6 @@ process buildTree {
 
 process refineTree {
     publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
-    echo true
 
     input:
     path(tree) from tree_raw_ch
