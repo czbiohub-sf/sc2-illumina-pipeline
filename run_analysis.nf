@@ -57,7 +57,7 @@ Channel
 
 Channel
   .fromPath(params.sample_sequences)
-  .into {merge_fastas_ch}
+  .set {merge_fastas_ch}
 
 
 
