@@ -452,7 +452,6 @@ else {
 }
 
 process firstFilter {
-  label "nextstrain"
   publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
   input:
@@ -482,7 +481,6 @@ process firstFilter {
 
 process alignSequences {
   label "process_large"
-  label "nextstrain"
   publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
 
@@ -507,7 +505,6 @@ process alignSequences {
 }
 
 process extractSampleSequences {
-  label 'nextstrain'
   publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
 
@@ -552,7 +549,6 @@ process makePriorities {
 }
 
 process filterStrains {
-    label 'nextstrain'
     publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
     input:
@@ -581,7 +577,6 @@ process filterStrains {
 }
 
 process buildTree {
-    label 'nextstrain'
     publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
     cpus 4
@@ -603,7 +598,6 @@ process buildTree {
 }
 
 process refineTree {
-    label 'nextstrain'
     publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
     input:
@@ -637,7 +631,6 @@ process refineTree {
 }
 
 process ancestralSequences {
-    label 'nextstrain'
     publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
     input:
@@ -659,7 +652,6 @@ process ancestralSequences {
 }
 
 process translateSequences {
-    label 'nextstrain'
     publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
     input:
@@ -682,7 +674,6 @@ process translateSequences {
 
 
 process inferTraits {
-    label 'nextstrain'
     publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
     input:
@@ -705,7 +696,6 @@ process inferTraits {
 }
 
 process addClades {
-    label 'nextstrain'
     publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
     input:
@@ -727,7 +717,6 @@ process addClades {
 }
 
 process tipFrequencies {
-    label 'nextstrain'
     publishDir "${params.outdir}/nextstrain/auspice", mode: 'copy'
 
     input:
@@ -752,7 +741,6 @@ process tipFrequencies {
 }
 
 process exportData {
-    label 'nextstrain'
     publishDir "${params.outdir}/nextstrain/auspice", mode: 'copy'
 
     input:
