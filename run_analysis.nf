@@ -188,7 +188,40 @@ process buildBLASTDB {
     """
 }
 
-process blastConsensus {
+if (params.nextstrain_ncov) {
+  nextstrain_ncov = params.nextstrain_ncov
+  if (nextstrain_ncov[-1] != "/") {
+      nextstrain_ncov = nextstrain_ncov + "/"
+  }
+  blast_metadata = file(nextstrain_ncov + "data/metadata.tsv", checkIfExists: true)
+  process findContextuals {
+      tag {sampleName}
+      publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
+
+      input:
+      tuple(sampleName, path(assembly)) from blastconsensus_in
+      path(dbsequences) from blast_clean_ch
+      path(blastdb) from blastdb_ch
+      path(ref_fasta)
+      path(blast_metadata)
+
+      output:
+      path("${sampleName}.blast.tsv")
+      tuple(sampleName, path("${sampleName}_nearest_blast.fasta")) into (nearest_neighbor, collectnearest_in)
+
+      script:
+      """
+      get_top_hit.py --minLength ${params.minLength} \
+        --sequences ${dbsequences} \
+        --sampleName ${sampleName} \
+        --assembly ${assembly} \
+        --default ${ref_fasta} \
+        --metadata ${blast_metadata}
+      """
+  }
+}
+else {
+  process blastConsensus {
     tag {sampleName}
     publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
 
@@ -210,6 +243,7 @@ process blastConsensus {
       --assembly ${assembly} \
       --default ${ref_fasta}
     """
+  }
 }
 
 process collectNearest {
