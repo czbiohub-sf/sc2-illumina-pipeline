@@ -26,6 +26,7 @@ def helpMessage() {
       --group_by                    string, parameter to augur filter (default: 'division year month')
       --sequences_per_group_1       Initial subsampling (default: 500)
       --sequences_per_group_2       Contextual subsampling by priority (default: 20)
+      --existing_alignment          Add to existing alignment in augur align step
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -336,6 +337,7 @@ process filterAssemblies {
     """
 }
 
+nextstrain_ch.into {nextstrain_ch, sample_sequences_ch}
 // Setup nextstrain files
 
 if (params.nextstrain_sequences && params.nextstrain_ncov) {
@@ -479,6 +481,13 @@ process firstFilter {
   """
 }
 
+if (params.existing_alignment) {
+  existing_alignment = file(params.existing_alignment, checkIfExists: true)
+} else {
+  // set existing_alignment to something nonempty so process will run
+  existing_alignment = file(params.ref_fasta, checkIfExists: true)
+}
+
 process alignSequences {
   label "process_large"
   publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
@@ -487,11 +496,25 @@ process alignSequences {
   input:
   path(sequences) from firstfiltered_ch
   path(ref_gb)
+  path(existing_alignment)
+  path(sample_sequences) from sample_sequences_in
 
   output:
   path("aligned_sequences.fasta") into (firstaligned_ch, makepriorities_ch, filterstrains_in)
 
   script:
+  if (params.existing_alignment)
+  """
+  augur align \
+            --sequences ${sample_sequences} \
+            --reference-sequence ${ref_gb} \
+            --output aligned_sequences.fasta \
+            --nthreads ${task.cpus} \
+            --remove-reference \
+            --fill-gaps \
+            --existing-alignment ${params.existing_alignment}
+  """
+  else
   """
   augur align \
             --sequences ${sequences} \
