@@ -89,6 +89,7 @@ ercc_fasta = file(params.ercc_fasta, checkIfExists: true)
 process quantifyERCCs {
   tag {sampleName}
   publishDir "${params.outdir}/ercc-stats", mode: 'copy'
+  label 'process_medium'
 
   input:
   path(ercc_fasta)
@@ -130,6 +131,7 @@ process filterReads {
     if [ "\$LINES" -gt 0 ];
     then
         kraken2 --db ${db} \
+          --threads ${task.cpus} \
           --report ${sampleName}.kraken2_report \
           --classified-out "${sampleName}_classified#.fq" \
           --output - \
@@ -171,6 +173,7 @@ if (params.skip_trim_adapters) {
 
 process trimReads {
     tag { sampleName }
+    label 'process_medium'
     publishDir "${params.outdir}/trimmed-reads", mode: 'copy',
         saveAs: { x -> x.endsWith(".fq.gz") ? x : null }
 
@@ -227,6 +230,7 @@ process alignReads {
 
 process trimPrimers {
     tag { sampleName }
+    label 'process_medium'
     publishDir "${params.outdir}/aligned-reads", mode: 'copy'
 
     input:
@@ -258,6 +262,7 @@ if (!params.intrahost_variants) {
 process intrahostVariants {
     publishDir "${params.outdir}/",
         mode: 'copy'
+    label 'process_medium'
 
     cpus params.intrahost_variants_cpu
 
@@ -286,6 +291,7 @@ process intrahostVariants {
 process makeConsensus {
   tag { sampleName }
   publishDir "${params.outdir}/consensus-seqs", mode: 'copy'
+  label 'process_medium'
 
   input:
   tuple(sampleName, path(bam)) from consensus_bam
@@ -295,11 +301,11 @@ process makeConsensus {
 
   script:
   """
-        samtools index ${bam}
+  samtools index ${bam}
   samtools mpileup -A -d ${params.mpileupDepth} -Q0 ${bam} |
-    ivar consensus -q ${params.ivarQualThreshold} -t ${params.ivarFreqThreshold} -m ${params.minDepth} -n N -p ${sampleName}.primertrimmed.consensus
-        echo '>${sampleName}' > ${sampleName}.consensus.fa
-        seqtk seq -l 50 ${sampleName}.primertrimmed.consensus.fa | tail -n +2 >> ${sampleName}.consensus.fa
+      ivar consensus -q ${params.ivarQualThreshold} -t ${params.ivarFreqThreshold} -m ${params.minDepth} -n N -p ${sampleName}.primertrimmed.consensus
+  echo '>${sampleName}' > ${sampleName}.consensus.fa
+  seqtk seq -l 50 ${sampleName}.primertrimmed.consensus.fa | tail -n +2 >> ${sampleName}.consensus.fa
   """
 }
 
@@ -309,6 +315,7 @@ merge_fastas_ch = merge_fastas_ch.map { it[1] }
 
 process quast {
    tag { sampleName }
+   label 'process_medium'
    publishDir "${params.outdir}/QUAST", mode: 'copy'
 
    input:
@@ -336,6 +343,7 @@ process quast {
 
 process realignConsensus {
     tag { sampleName }
+    label 'process_medium'
     publishDir "${params.outdir}/realigned-seqs", mode: 'copy'
 
     input:
@@ -360,6 +368,7 @@ combined_variants_bams = combined_variants_bams.map { it[1] }.collect()
 
 process callVariants {
     tag { sampleName }
+    label 'process_medium'
     publishDir "${params.outdir}/sample-variants", mode: 'copy'
 
     input:
@@ -388,6 +397,7 @@ stats_reads
 
 process computeStats {
     tag { sampleName }
+    label 'process_small'
     publishDir "${params.outdir}/coverage-plots", mode: 'copy',
         saveAs: { x -> x.endsWith(".png") ? x : null }
 
@@ -422,6 +432,7 @@ process computeStats {
 
 process combinedVariants {
     publishDir "${params.outdir}", mode: 'copy'
+    label 'process_medium'
 
     input:
     path(in_bams) from combined_variants_bams
@@ -440,6 +451,7 @@ process combinedVariants {
 
 process mergeAllAssemblies {
     publishDir "${params.outdir}", mode: 'copy'
+    label 'process_tiny'
 
     input:
     path(in_fasta) from merge_fastas_ch.collect()
@@ -455,6 +467,7 @@ process mergeAllAssemblies {
 
 process mergeAssemblyStats {
     publishDir "${params.outdir}/call_consensus-stats", mode: 'copy'
+    label 'process_small'
 
     input:
     path(in_json) from stats_ch.collect()
@@ -471,6 +484,7 @@ process mergeAssemblyStats {
 process filterAssemblies {
     publishDir "${params.outdir}", mode: 'copy',
       saveAs: {x -> x.endsWith(".tsv") ? "call_consensus-stats/$x" : x}
+    label 'process_small'
 
     input:
     path(merged_stats) from merged_stats_ch
@@ -493,6 +507,7 @@ process filterAssemblies {
 
 process multiqc {
     publishDir "${params.outdir}/MultiQC", mode: 'copy'
+    label 'process_medium'
 
     input:
     path(trim_galore_results) from trimmed_reports.collect().ifEmpty([])

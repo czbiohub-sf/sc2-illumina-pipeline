@@ -21,5 +21,13 @@ dependencies:
   - pysam=0.15.4
   - blast=2.9.0
   - seqkit=0.12.0
-  - pip
   - git
+  - mafft
+  - raxml
+  - fasttree
+  - iqtree
+  - vcftools
+  - snakemake
+  - pip
+  - pip:
+    - nextstrain-augur
