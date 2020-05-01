@@ -34,10 +34,10 @@ if len(SeqIO.read(args.assembly, 'fasta')) > 0:
     else:
         try:
             # In case the TSV is empty
-            top_hit = df[df['bitscore']==df['bitscore'].max()]['sacc'][0]
+            top_hit = df[df['bitscore']==df['bitscore'].max()]['sacc']
             sequences = SeqIO.index(args.sequences, 'fasta')
-            top_hit_seq = sequences[top_hit]
-            SeqIO.write(top_hit_seq, f'{args.sampleName}_nearest_blast.fasta', 'fasta')
+            top_hit_seqs = [sequences[h] for h in top_hit]
+            SeqIO.write(top_hit_seqs, f'{args.sampleName}_nearest_blast.fasta', 'fasta')
         except IndexError:
             shutil.copyfile(args.default, f'{args.sampleName}_nearest_blast.fasta')
 else:
