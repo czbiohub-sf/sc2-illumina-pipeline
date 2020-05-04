@@ -36,9 +36,9 @@ if args.neighborvcf:
 
 # separate extraction of neighbor name from FASTA if no VCF
 elif args.neighborfasta:
-    neighbor_fasta = SeqIO.read(args.neighborfasta, 'fasta')
-    nearest_neighbor = neighbor_fasta.name
-    stats["nearest_sequence"] = nearest_neighbor
+    neighbor_fasta = SeqIO.parse(args.neighborfasta, 'fasta')
+    nearest_neighbor = [f.name for f in neighbor_fasta]
+    stats["nearest_sequence"] = '\n'.join(nearest_neighbor)
 
 
 if args.cleaned_bam:
