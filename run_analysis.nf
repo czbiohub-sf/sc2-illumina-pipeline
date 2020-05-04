@@ -536,7 +536,7 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
     existing_alignment = file(params.existing_alignment, checkIfExists: true)
   } else {
     // set existing_alignment to something nonempty so process will run
-    existing_alignment = file(params.ref_fasta, checkIfExists: true)
+    existing_alignment = file(params.ref, checkIfExists: true)
   }
 
   process alignSequences {
