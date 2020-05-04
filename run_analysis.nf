@@ -220,12 +220,13 @@ process collectNearest {
     path(fastas) from collectnearest_in.map{it[1]}.collect()
 
     output:
-    path("included_samples.fasta") into included_fastas_ch
+    path("included_samples.fasta") into (included_fastas_ch, contextual_fastas_ch)
 
     script:
     """
     cat ${fastas} > all_included_samples.fasta
-    seqkit rmdup all_included_samples.fasta > included_samples.fasta
+    seqkit rmdup all_included_samples.fasta > deduped_included_samples.fasta
+    seqkit faidx -f -r deduped_included_samples.fasta '^[^MN908947.3].*' > included_samples.fasta
     """
 }
 
