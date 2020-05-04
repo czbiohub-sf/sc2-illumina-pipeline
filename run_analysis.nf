@@ -509,6 +509,7 @@ process firstFilter {
             --min-length ${params.minLength} \
             --group-by ${params.group_by} \
             --sequences-per-group ${params.sequences_per_group_1} \
+            --include-where division=California \
             --output filtered_sequences.fasta
   """
 }
@@ -606,6 +607,7 @@ process filterStrains {
             --group-by ${params.group_by} \
             --sequences-per-group ${params.sequences_per_group_2} \
             --min-length ${params.minLength} \
+            --include-where division=California \
             --output filtered_aligned.fasta \
     """
 }
