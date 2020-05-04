@@ -502,16 +502,17 @@ process alignSequences {
   path(sequences) from firstfiltered_ch
   path(ref_gb)
   path(existing_alignment)
-  path(sample_sequences) from sample_sequences_ch
+  path(sample_sequences) from sample_and_contextual_ch
 
   output:
-  path("aligned_sequences.fasta") into (firstaligned_ch, makepriorities_ch, filterstrains_in)
+  path("aligned_raw.fasta") into (firstaligned_ch, makepriorities_ch, filterstrains_in)
 
   script:
   if (params.existing_alignment)
   """
+  cat ${sample_sequences} > sample_and_contextual.fasta
   augur align \
-            --sequences ${sample_sequences} \
+            --sequences sample_and_contextual.fasta \
             --reference-sequence ${ref_gb} \
             --output aligned_raw.fasta \
             --nthreads ${task.cpus} \
