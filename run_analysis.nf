@@ -339,6 +339,11 @@ process filterAssemblies {
 }
 
 nextstrain_ch.into {nextstrain_ch; sample_sequences_ch}
+
+sample_sequences_ch
+  .mix(contextual_fastas_ch)
+  .collect()
+  .set {sample_and_contextual_ch}
 // Setup nextstrain files
 
 if (params.nextstrain_sequences && params.nextstrain_ncov) {
