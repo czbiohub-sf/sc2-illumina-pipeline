@@ -291,7 +291,7 @@ process intrahostVariants {
 process makeConsensus {
   tag { sampleName }
   publishDir "${params.outdir}/consensus-seqs", mode: 'copy'
-  label 'process_medium'
+  label 'process_large'
 
   input:
   tuple(sampleName, path(bam)) from consensus_bam

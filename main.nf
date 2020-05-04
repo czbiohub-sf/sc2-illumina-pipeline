@@ -334,8 +334,9 @@ process nearestVariants {
 
     script:
     """
+    cat ${nearest_blast} | awk '/^>/ {n++} n>1 {exit} {print}' > nearest_blast.fasta
     minimap2 -ax asm5 -R '@RG\\tID:${sampleName}\\tSM:${sampleName}' \
-      ${nearest_blast} ${assembly} |
+      nearest_blast.fasta ${assembly} |
       samtools sort -O bam -o ${sampleName}.nearest_realigned.bam
     samtools index ${sampleName}.nearest_realigned.bam
     bcftools mpileup -f ${nearest_blast}  ${sampleName}.nearest_realigned.bam |

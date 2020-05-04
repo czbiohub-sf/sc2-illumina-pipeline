@@ -189,7 +189,40 @@ process buildBLASTDB {
     """
 }
 
-process blastConsensus {
+if (params.nextstrain_ncov) {
+  nextstrain_ncov = params.nextstrain_ncov
+  if (nextstrain_ncov[-1] != "/") {
+      nextstrain_ncov = nextstrain_ncov + "/"
+  }
+  blast_metadata = file(nextstrain_ncov + "data/metadata.tsv", checkIfExists: true)
+  process findContextuals {
+      tag {sampleName}
+      publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
+
+      input:
+      tuple(sampleName, path(assembly)) from blastconsensus_in
+      path(dbsequences) from blast_clean_ch
+      path(blastdb) from blastdb_ch
+      path(ref_fasta)
+      path(blast_metadata)
+
+      output:
+      path("${sampleName}.blast.tsv")
+      tuple(sampleName, path("${sampleName}_nearest_blast.fasta")) into (nearest_neighbor, collectnearest_in)
+
+      script:
+      """
+      get_top_hit.py --minLength ${params.minLength} \
+        --sequences ${dbsequences} \
+        --sampleName ${sampleName} \
+        --assembly ${assembly} \
+        --default ${ref_fasta} \
+        --metadata ${blast_metadata}
+      """
+  }
+}
+else {
+  process blastConsensus {
     tag {sampleName}
     publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
 
@@ -211,6 +244,7 @@ process blastConsensus {
       --assembly ${assembly} \
       --default ${ref_fasta}
     """
+  }
 }
 
 process collectNearest {
@@ -367,6 +401,7 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
   sample_metadata = params.sample_metadata ? file(params.sample_metadata, checkIfExists: true) : Channel.empty()
 
 
+
   if (params.sample_metadata) {
     process combineNextstrainInputs {
         publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
@@ -387,6 +422,9 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
         path("internal_samples.txt") into sample_ids
         path("external_samples.txt") into external_ids
         path("all_sequences.fasta")
+
+        when:
+        params.nextstrain_ncov
 
         script:
         // Normalize the GISAID names using Nextstrain's bash script
@@ -428,6 +466,9 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
         path("internal_samples.txt") into sample_ids
         path("external_samples.txt") into external_ids
         path("all_sequences.fasta")
+
+        when:
+        params.nextstrain_ncov
 
         script:
         currdate = new java.util.Date().format('yyyy-MM-dd')
@@ -471,6 +512,9 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
     output:
     path("filtered_sequences.fasta") into firstfiltered_ch
 
+    when:
+    params.nextstrain_ncov
+
     script:
     String exclude_where = "date='2020' date='2020-01-XX' date='2020-02-XX' date='2020-03-XX' date='2020-04-XX' date='2020-01' date='2020-02' date='2020-03' date='2020-04'"
     """
@@ -483,6 +527,7 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
               --min-length ${params.minLength} \
               --group-by ${params.group_by} \
               --sequences-per-group ${params.sequences_per_group_1} \
+              --include-where division=California \
               --output filtered_sequences.fasta
     """
   }
@@ -546,6 +591,9 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
     output:
     path("aligned_samples.fasta") into aligned_samples_ch
 
+    when:
+    params.nextstrain_ncov
+
     script:
     """
     augur filter \
@@ -567,6 +615,9 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
 
     output:
     path("priorities.tsv") into priorities_tsv
+
+    when:
+    params.nextstrain_ncov
 
     script:
     """
@@ -590,6 +641,9 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
       output:
       path('filtered_aligned.fasta') into (aligned_ch, refinetree_alignment, ancestralsequences_alignment)
 
+      when:
+      params.nextstrain_ncov
+
       script:
       """
       augur filter \
@@ -601,6 +655,7 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
               --group-by ${params.group_by} \
               --sequences-per-group ${params.sequences_per_group_2} \
               --min-length ${params.minLength} \
+              --include-where division=California \
               --output filtered_aligned.fasta \
       """
   }
@@ -615,6 +670,9 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
 
       output:
       path("tree_raw.nwk") into tree_raw_ch
+
+      when:
+      params.nextstrain_ncov
 
       script:
       """
@@ -637,6 +695,9 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
       output:
       path('tree.nwk') into (ancestralsequences_tree, translatesequences_tree, infertraits_tree, addclades_tree, tipfreq_tree, export_tree)
       path('branch_lengths.json') into export_branch_lengths
+
+      when:
+      params.nextstrain_ncov
 
       script:
       """
@@ -669,6 +730,9 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
       output:
       path('nt_muts.json') into (translatesequences_nodes, addclades_nuc_muts, export_nt_muts)
 
+      when:
+      params.nextstrain_ncov
+
       script:
       """
       augur ancestral \
@@ -691,6 +755,9 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
       output:
       path('aa_muts.json') into (addclades_aa_muts, export_aa_muts)
 
+      when:
+      params.nextstrain_ncov
+
       script:
       """
       augur translate \
@@ -711,6 +778,9 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
 
       output:
       path('traits.json') into export_traits
+
+      when:
+      params.nextstrain_ncov
 
       script:
       """
@@ -736,6 +806,9 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
       output:
       path('clades.json') into export_clades
 
+      when:
+      params.nextstrain_ncov
+
       script:
       """
       augur clades --tree ${tree} \
@@ -754,6 +827,9 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
 
       output:
       path('ncov_tip-frequencies.json')
+
+      when:
+      params.nextstrain_ncov
 
       script:
       """
@@ -786,6 +862,9 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
       output:
       path('ncov.json') into extractvariants_in
 
+      when:
+      params.nextstrain_ncov
+
       script:
       """
       augur export v2 \
@@ -806,6 +885,9 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
 
     output:
     path("new_mutations.csv")
+
+    when:
+    params.nextstrain_ncov
 
     script:
     """
