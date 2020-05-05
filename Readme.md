@@ -2,7 +2,7 @@
 
 This pipeline has two major components:
 
-1. Assembling SARs-CoV-2 genomes from short/long read files.
+1. Assembly and QC of SARs-CoV-2 genomes from raw sequencing reads (fastq files).
 2. Constructing a phylogenetic tree containing high-quality genomes from the pipeline and contextual reference genomes from GISAID.
 
 For assembly, we use a simple approach based on alignment to reference.
