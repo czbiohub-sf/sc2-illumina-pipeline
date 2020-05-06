@@ -11,5 +11,5 @@ args = parser.parse_args()
 sample_meta = pd.read_csv(args.sample_metadata, sep='\t')
 global_meta = pd.read_csv(args.global_metadata, sep='\t')
 
-df = pd.concat([global_meta, sample_meta], how='inner', ignore_index=True)
+df = pd.concat([global_meta, sample_meta], join='inner', ignore_index=True)
 df.to_csv('metadata.tsv', sep='\t', index=False)
