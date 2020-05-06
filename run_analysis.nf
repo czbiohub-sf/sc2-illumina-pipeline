@@ -12,6 +12,7 @@ def helpMessage() {
       --ref_gb                      Reference Genbank file for augur (default: data/MN908947.3.gb)
       --blast_sequences             FASTA of sequences for BLAST alignment
       --nextstrain_sequences        FASTA of sequences to build a tree with
+      --nextstrain_metadata         Metadata table for nextstrain obtained from GISAID
       --minLength                   Minimum base pair length to allow assemblies to pass QC (default: 29000)
       --maxNs                       Max number of Ns to allow assemblies to pass QC (default: 100)
 
@@ -262,7 +263,7 @@ process collectNearest {
     seqkit faidx -f -r deduped_included_samples.fasta '^[^MN908947.3].*' > included_samples.fasta
     """
 }
-
+included_fastas_ch = included_fastas_ch.first()
 stats_fa
   .join(variants_ch)
   .join(primer_variants_vcf)
@@ -370,6 +371,104 @@ process filterAssemblies {
         --out_prefix filtered
     """
 }
+// Turns queue channel into value channel
+nextstrain_ch = nextstrain_ch.first()
+
+process makeSampleMetadata {
+  publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
+
+  input:
+  path(sample_sequences) from nextstrain_ch
+
+  output:
+  path("sample_metadata.tsv") into sample_metadata
+
+  when:
+  !params.sample_metadata
+
+  script:
+  currdate = new java.util.Date().format('yyyy-MM-dd')
+  """
+  make_sample_metadata.py \
+    --sample_sequences ${sample_sequences} \
+    --output sample_metadata.tsv \
+    --date $currdate \
+    --region North America \
+    --country USA \
+    --division California \
+    --location San Francisco \
+    --submitting_lab Biohub \
+    --date_submitted $currdate
+  """
+}
+
+if (params.sample_metadata) {
+  sample_metadata = file(param.sample_metadata, checkIfExists: true)
+} else {
+  sample_metadata = sample_metadata.first()
+}
+
+if (params.nextstrain_metadata && params.nextstrain_sequences) {
+  global_metadata = file(params.nextstrain_metadata, checkIfExists: true)
+  global_sequences = file(params.nextstrain_sequences, checkIfExists: true)
+} else {
+  global_metadata = Channel.empty()
+  global_sequences = Channel.empty()
+}
+
+sample_sequences = nextstrain_ch
+
+process makeNextstrainMetadata {
+  publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
+
+  input:
+  path(global_metadata)
+  path(sample_metadata)
+
+  output:
+  path("metadata.tsv")
+
+  script:
+  // Use a custom python script to merge so that we ensure columns are the same
+  """
+  combine_metadata.py --sample_metadata ${sample_metadata} \
+    --global_metadata ${global_metadata}
+  """
+}
+
+process makeNextstrainSequences {
+  publishDir "${params.outdir}/nextstrain/data", mode: 'copy'
+
+  input:
+  path(global_sequences)
+  path(sample_sequences)
+
+  output:
+  path("sequences.fasta")
+
+  script:
+  """
+  cat ${global_sequences} ${sample_sequences} > sequences.fasta
+  """
+}
+
+process makeNextstrainInclude {
+  publishDir "${params.outdir}/nextstrain/config", mode: 'copy'
+
+  input:
+  path(sample_sequences)
+  path(included_contextual_fastas) from included_fastas_ch
+
+  output:
+  path("include.txt")
+
+  script:
+  """
+  cat ${sample_sequences} | grep '>' | awk -F '>' '{print \$2}' > internal_samples.txt
+  cat ${included_contextual_fastas} | grep '>' | awk -F '>' '{print \$2}' > included_nearest.txt
+  cat internal_samples.txt included_nearest.txt > include.txt
+  """
+}
 
 // Setup nextstrain files
 
@@ -382,7 +481,7 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
       nextstrain_ncov = nextstrain_ncov + "/"
   }
 
-  nextstrain_metadata_path = file(nextstrain_ncov + "data/metadata.tsv", checkIfExists: true)
+  nextstrain_metadata_path = file(params.nextstrain_metadata, checkIfExists: true)
   nextstrain_config = nextstrain_ncov + "config/"
   include_file = file(nextstrain_config + "include.txt", checkIfExists: true)
   exclude_file = file(nextstrain_config + "exclude.txt", checkIfExists: true)

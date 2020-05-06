@@ -23,7 +23,8 @@ parser.add_argument('--submitting_lab', '-sublab', help='Submitting lab (e.g. Bi
 parser.add_argument('--date_submitted', '-subdate', help='Date of submission')
 args = parser.parse_args()
 
-sequences = list(SeqIO.parse(args.new_sequences, 'fasta'))
+if args.new_sequences:
+    sequences = list(SeqIO.parse(args.new_sequences, 'fasta'))
 
 # Build the new metadata.tsv
 old_metadata = pd.read_csv(args.prev_metadata, sep='\t')
@@ -68,5 +69,6 @@ df = pd.concat([old_metadata, new_metadata], sort=False)
 df.to_csv('metadata.tsv', sep='\t', index=False)
 
 # Build the new sequences.fasta
-old_sequences = list(SeqIO.parse(args.prev_sequences, 'fasta'))
-SeqIO.write(old_sequences + sequences, 'all_sequences.fasta', 'fasta')
+if args.new_sequences and arg.prev_sequences:
+    old_sequences = list(SeqIO.parse(args.prev_sequences, 'fasta'))
+    SeqIO.write(old_sequences + sequences, 'all_sequences.fasta', 'fasta')
