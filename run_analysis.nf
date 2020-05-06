@@ -20,6 +20,7 @@ def helpMessage() {
       --sample_metadata             TSV of metadata from main output
       --clades                      TSV with clades from nextstrain (default: data/clades.tsv)
       --sample_vcfs                 Glob pattern of corresponding VCF files
+      --public_identifiers          TSV to rename samples to public identifiers, need columns sample_name, submission_ID
 
 
     Nextstrain options:
@@ -53,13 +54,52 @@ ref_gb = params.ref_gb ? file(params.ref_gb, checkIfExists: true) : Channel.empt
 Channel
   .fromPath(params.sample_sequences)
   .map {file -> tuple(file.simpleName, file) }
-  .into {blastconsensus_in; realign_fa; stats_fa}
+  .set {rename_in}
 
-Channel
-  .fromPath(params.sample_sequences)
-  .into {merge_fastas_ch}
+public_identifiers = params.public_identifiers ? file(params.public_identifiers, checkIfExists: true) : Channel.empty()
+process renameSamples {
+  tag { sampleName }
 
+  input:
+  tuple(sampleName, path(in_fa)) from rename_in
+  path(public_identifiers)
 
+  output:
+  path("*.fasta") into realign_fa
+
+  when:
+  params.public_identifiers
+
+  script:
+  """
+  #!/usr/bin/env python3
+
+  import pandas as pd
+  from Bio import SeqIO
+
+  df = pd.read_csv('${public_identifiers}', sep='\t')
+  submission_id = df[df['sample_name']=='${sampleName}']['submission_ID'].values[0]
+
+  seq = SeqIO.read('${in_fa}', 'fasta')
+  seq.id = submission_id
+  seq.description = submission_id
+  seq.name = submission_id
+  SeqIO.write(seq, f'{submission_id}.fasta', 'fasta')
+  """
+}
+if (params.public_identifiers) {
+  realign_fa
+    .into{merge_fastas_ch; realign_fa}
+  realign_fa
+    .map{file -> tuple(file.simpleName, file)}
+    .into {realign_fa; blastconsensus_in; stats_fa}
+} else {
+    rename_in
+      .into {realign_fa; blastconsensus_in; stats_fa}
+    Channel
+      .fromPath(params.sample_sequences)
+      .set {merge_fastas_ch}
+}
 
 process realignConsensus {
     tag { sampleName }
