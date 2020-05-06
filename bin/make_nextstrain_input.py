@@ -69,6 +69,6 @@ df = pd.concat([old_metadata, new_metadata], sort=False)
 df.to_csv('metadata.tsv', sep='\t', index=False)
 
 # Build the new sequences.fasta
-if args.new_sequences and arg.prev_sequences:
+if args.new_sequences and args.prev_sequences:
     old_sequences = list(SeqIO.parse(args.prev_sequences, 'fasta'))
     SeqIO.write(old_sequences + sequences, 'all_sequences.fasta', 'fasta')
