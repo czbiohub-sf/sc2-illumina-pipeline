@@ -12,6 +12,7 @@ def helpMessage() {
       --ref_gb                      Reference Genbank file for augur (default: data/MN908947.3.gb)
       --blast_sequences             FASTA of sequences for BLAST alignment
       --nextstrain_sequences        FASTA of sequences to build a tree with
+      --nextstrain_metadata         TSV from GISAID
       --minLength                   Minimum base pair length to allow assemblies to pass QC (default: 29000)
       --maxNs                       Max number of Ns to allow assemblies to pass QC (default: 100)
 
@@ -195,7 +196,7 @@ if (params.nextstrain_ncov) {
   if (nextstrain_ncov[-1] != "/") {
       nextstrain_ncov = nextstrain_ncov + "/"
   }
-  blast_metadata = file(nextstrain_ncov + "data/metadata.tsv", checkIfExists: true)
+  blast_metadata = file(params.nextstrain_metadata, checkIfExists: true)
   process findContextuals {
       tag {sampleName}
       publishDir "${params.outdir}/samples/${sampleName}", mode: 'copy'
@@ -411,7 +412,7 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
       nextstrain_ncov = nextstrain_ncov + "/"
   }
 
-  nextstrain_metadata_path = file(nextstrain_ncov + "data/metadata.tsv", checkIfExists: true)
+  nextstrain_metadata_path = file(params.nextstrain_metadata, checkIfExists: true)
   nextstrain_config = nextstrain_ncov + "config/"
   include_file = file(nextstrain_config + "include.txt", checkIfExists: true)
   exclude_file = file(nextstrain_config + "exclude.txt", checkIfExists: true)
