@@ -29,6 +29,7 @@ sequences = list(SeqIO.parse(args.new_sequences, 'fasta'))
 old_metadata = pd.read_csv(args.prev_metadata, sep='\t')
 if args.new_metadata:
     new_metadata = pd.read_csv(args.new_metadata, sep='\t')
+    new_metadata = new_metadata[~new_metadata['strain'].isin(old_metadata['strain'])]
 else:
     new_metadata = pd.DataFrame()
 
