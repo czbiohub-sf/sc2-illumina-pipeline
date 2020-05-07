@@ -26,6 +26,7 @@ def helpMessage() {
       --group_by                    string, parameter to augur filter (default: 'division year month')
       --sequences_per_group_1       Initial subsampling (default: 500)
       --sequences_per_group_2       Contextual subsampling by priority (default: 20)
+      --existing_alignment          Add to existing alignment in augur align step
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -56,7 +57,7 @@ Channel
 
 Channel
   .fromPath(params.sample_sequences)
-  .into {merge_fastas_ch}
+  .set {merge_fastas_ch}
 
 
 
@@ -253,7 +254,7 @@ process collectNearest {
     path(fastas) from collectnearest_in.map{it[1]}.collect()
 
     output:
-    path("included_samples.fasta") into included_fastas_ch
+    path("included_samples.fasta") into (included_fastas_ch, contextual_fastas_ch)
 
     script:
     """
@@ -371,6 +372,12 @@ process filterAssemblies {
     """
 }
 
+nextstrain_ch.into {nextstrain_ch; sample_sequences_ch}
+
+sample_sequences_ch
+  .mix(contextual_fastas_ch)
+  .collect()
+  .set {sample_and_contextual_ch}
 // Setup nextstrain files
 
 if (params.nextstrain_sequences && params.nextstrain_ncov) {
@@ -525,27 +532,45 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
     """
   }
 
+  if (params.existing_alignment) {
+    existing_alignment = file(params.existing_alignment, checkIfExists: true)
+  } else {
+    // set existing_alignment to something nonempty so process will run
+    existing_alignment = file(params.ref, checkIfExists: true)
+  }
+
   process alignSequences {
     label "process_large"
     publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
 
-
     input:
     path(sequences) from firstfiltered_ch
     path(ref_gb)
+    path(existing_alignment)
+    path(sample_sequences) from sample_and_contextual_ch
 
     output:
-    path("aligned_sequences.fasta") into (firstaligned_ch, makepriorities_ch, filterstrains_in)
-
-    when:
-    params.nextstrain_ncov
+    path("aligned_raw.fasta") into (firstaligned_ch, makepriorities_ch, filterstrains_in)
 
     script:
+    if (params.existing_alignment)
+    """
+    cat ${sample_sequences} > sample_and_contextual.fasta
+    augur align \
+              --sequences sample_and_contextual.fasta \
+              --reference-sequence ${ref_gb} \
+              --output aligned_raw.fasta \
+              --nthreads ${task.cpus} \
+              --remove-reference \
+              --fill-gaps \
+              --existing-alignment ${existing_alignment}
+    """
+    else
     """
     augur align \
               --sequences ${sequences} \
               --reference-sequence ${ref_gb} \
-              --output aligned_sequences.fasta \
+              --output aligned_raw.fasta \
               --nthreads ${task.cpus} \
               --remove-reference \
               --fill-gaps
