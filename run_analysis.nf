@@ -72,23 +72,10 @@ process renameSamples {
 
   script:
   """
-  #!/usr/bin/env python3
-
-  import pandas as pd
-  from Bio import SeqIO
-  import re
-
-  df = pd.read_csv('${public_identifiers}', sep='\t')
-  try:
-    submission_id = df[df['sample_name']=='${sampleName}']['gisaid_name'].values[0]
-    submission_id = re.search(pattern='hCoV-19/(.*)$', string=submission_id).group(1)
-  except IndexError:
-    submission_id = '${sampleName}'
-  seq = SeqIO.read('${in_fa}', 'fasta')
-  seq.id = submission_id
-  seq.description = submission_id
-  seq.name = submission_id
-  SeqIO.write(seq, f'{submission_id}.fasta', 'fasta')
+  rename_samples.py \
+    --sampleName $sampleName \
+    --public_identifiers ${public_identifiers} \
+    --in_fa ${in_fa}
   """
 }
 if (params.public_identifiers) {
