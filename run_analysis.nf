@@ -20,7 +20,7 @@ def helpMessage() {
       --sample_metadata             TSV of metadata from main output
       --clades                      TSV with clades from nextstrain (default: data/clades.tsv)
       --sample_vcfs                 Glob pattern of corresponding VCF files
-      --public_identifiers          TSV to rename samples to public identifiers, need columns sample_name, submission_ID
+      --public_identifiers          TSV to rename samples to public identifiers, need columns sample_name, gisaid_name
 
 
     Nextstrain options:
@@ -76,10 +76,12 @@ process renameSamples {
 
   import pandas as pd
   from Bio import SeqIO
+  import re
 
   df = pd.read_csv('${public_identifiers}', sep='\t')
   try:
-    submission_id = df[df['sample_name']=='${sampleName}']['submission_ID'].values[0]
+    submission_id = df[df['sample_name']=='${sampleName}']['gisaid_name'].values[0]
+    submission_id = re.search(pattern='hCoV-19/(.*)$', string=submission_id).group(1)
   except IndexError:
     submission_id = '${sampleName}'
   seq = SeqIO.read('${in_fa}', 'fasta')
