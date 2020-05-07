@@ -19,6 +19,7 @@ def helpMessage() {
       --sample_metadata             TSV of metadata from main output
       --clades                      TSV with clades from nextstrain (default: data/clades.tsv)
       --sample_vcfs                 Glob pattern of corresponding VCF files
+      --public_identifiers          TSV to rename samples to public identifiers, need columns sample_name, gisaid_name
 
 
     Nextstrain options:
@@ -372,9 +373,30 @@ process filterAssemblies {
     """
 }
 
-nextstrain_ch.into {nextstrain_ch; sample_sequences_ch}
+public_identifiers = params.public_identifiers ? file(params.public_identifiers, checkIfExists: true) : Channel.empty()
+process renameAssemblies {
+  publishDir "${params.outdir}", mode: 'copy'
 
-sample_sequences_ch
+  input:
+  path(in_fa) from nextstrain_ch
+  path(public_identifiers)
+
+  output:
+  path("renamed_sequences.fasta") into renamed_asm
+
+  when:
+  params.public_identifiers
+
+  script:
+  """
+  rename_samples.py --in_fa ${in_fa} --public_identifiers ${public_identifiers}
+  """
+}
+if (params.public_identifiers) {
+  nextstrain_ch = renamed_asm
+}
+
+nextstrain_ch
   .mix(contextual_fastas_ch)
   .collect()
   .set {sample_and_contextual_ch}
