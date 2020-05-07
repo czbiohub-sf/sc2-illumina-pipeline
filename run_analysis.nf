@@ -504,7 +504,7 @@ if (!params.nextstrain_ncov) {
 nextstrain_ch.into {nextstrain_ch; sample_sequences_ch}
 
 sample_sequences_ch
-  .mix(contextual_fastas_ch)
+  .mix(included_fastas_ch)
   .collect()
   .set {sample_and_contextual_ch}
 // Setup nextstrain files
