@@ -78,8 +78,10 @@ process renameSamples {
   from Bio import SeqIO
 
   df = pd.read_csv('${public_identifiers}', sep='\t')
-  submission_id = df[df['sample_name']=='${sampleName}']['submission_ID'].values[0]
-
+  try:
+    submission_id = df[df['sample_name']=='${sampleName}']['submission_ID'].values[0]
+  except IndexError:
+    submission_id = '${sampleName}'
   seq = SeqIO.read('${in_fa}', 'fasta')
   seq.id = submission_id
   seq.description = submission_id
