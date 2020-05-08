@@ -1,5 +1,9 @@
 data/raw/*
 results/
+benchmark/*
+!benchmark/call_consensus-stats
+benchmark/call_consensus-stats/*
+!benchmark/call_consensus-stats/combined.stats.tsv
 work/
 .nextflow*
 scratch/
