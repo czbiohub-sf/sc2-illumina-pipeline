@@ -9,6 +9,21 @@ For assembly, we use a simple approach based on alignment to reference.
 
 For phylogenetics, we use the [augur](https://nextstrain.org/docs/bioinformatics/introduction-to-augur) pipeline developed by the Nextstrain team.
 
+# Typical usage
+
+For generating consensus genomes from reads:
+
+```{sh}
+nextflow run call_consensus.nf --reads 's3://path/to/reads/*_R{1,2}_001.fastq.gz*'
+```
+
+
+# Testing
+
+# Benchmarking
+
+# Pipeline Overview
+
 # Sequencing Protocols
 
 The current pipeline is designed to work with the MSSPE spiked primer enrichment [protocol](https://www.protocols.io/private/32717E8D59E211EABDB40242AC110003?step=4). Future versions will adapt to amplicon-based short- and long- read sequencing.

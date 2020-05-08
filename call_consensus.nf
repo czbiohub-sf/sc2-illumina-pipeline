@@ -5,7 +5,7 @@ def helpMessage() {
 
     The typical command for running the pipeline is as follows:
 
-    nextflow run main.nf --reads '*_R{1,2}_001.fastq.gz' --ref reference.fasta --primers primers.bed
+    nextflow run call_consensus.nf --reads '*_R{1,2}_001.fastq.gz' --ref reference.fasta --primers primers.bed
 
     Mandatory arguments:
       -profile                      Configuration profile to use. Can use multiple (comma separated)
