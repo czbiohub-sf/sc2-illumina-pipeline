@@ -14,7 +14,9 @@ For phylogenetics, we use the [augur](https://nextstrain.org/docs/bioinformatics
 For generating consensus genomes from reads:
 
 ```{sh}
-nextflow run call_consensus.nf --reads 's3://path/to/reads/*_R{1,2}_001.fastq.gz*' --profile docker
+nextflow run call_consensus.nf -profile docker \
+    --reads 's3://path/to/reads/*_R{1,2}_001.fastq.gz*' \
+    --outdir 's3://path/to/outdir'
 ```
 
 TODO Describe outputs
