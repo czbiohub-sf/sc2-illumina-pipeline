@@ -601,7 +601,7 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
     if (params.existing_alignment)
     """
     augur filter \
-          --sequences ${sequences}
+          --sequences ${sequences} \
           --metadata ${metadata} \
           --include-where division=California \
           --output CA_sequences.fasta
