@@ -686,6 +686,7 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
 
   process refineTree {
       publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
+      label 'process_large'
 
       input:
       path(tree) from tree_raw_ch
