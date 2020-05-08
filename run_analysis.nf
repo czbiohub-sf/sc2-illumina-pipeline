@@ -592,6 +592,7 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
     path(ref_gb)
     path(existing_alignment)
     path(sample_sequences) from sample_and_contextual_ch
+    path(metadata) from nextstrain_metadata
 
     output:
     path("aligned_raw.fasta") into (firstaligned_ch, makepriorities_ch, filterstrains_in)
@@ -599,7 +600,13 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
     script:
     if (params.existing_alignment)
     """
+    augur filter \
+          --sequences ${sequences}
+          --metadata ${metadata} \
+          --include-where division=California \
+          --output CA_sequences.fasta
     cat ${sample_sequences} > sample_and_contextual.fasta
+    cat CA_sequences.fasta >> sample_and_contextual.fasta 
     augur align \
               --sequences sample_and_contextual.fasta \
               --reference-sequence ${ref_gb} \
