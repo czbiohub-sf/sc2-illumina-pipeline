@@ -562,6 +562,27 @@ if (params.nextstrain_sequences && params.nextstrain_ncov) {
     existing_alignment = file(params.ref, checkIfExists: true)
   }
 
+  process includePreviousSequences {
+    publishDir "${params.outdir}/nextstrain/config", mode: 'copy'
+
+    input:
+    path(existing_alignment)
+    path(include) from nextstrain_include
+
+    output:
+    path("all_included_sequences.txt") into all_included_sequences
+
+    when:
+    params.existing_alignment
+
+    script:
+    """
+    cat ${existing_alignment} | grep '>' | awk -F '>' '{print \$2}' > existing_alignment_seqs.txt
+    cat ${include} existing_alignment_seqs.txt > intermediate.txt
+    sort intermediate.txt | uniq > all_included_sequences.txt
+    """
+  }
+
   process alignSequences {
     label "process_large"
     publishDir "${params.outdir}/nextstrain/results", mode: 'copy'
