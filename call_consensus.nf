@@ -140,7 +140,7 @@ process filterReads {
     label 'process_large'
 
     input:
-    path(db) from kraken2_db
+    path(db) from kraken2_db.collect()
     path(ref_fasta)
     tuple(sampleName, file(reads)) from kraken2_reads_in
 
