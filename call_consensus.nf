@@ -73,16 +73,46 @@ reads_ch = reads_ch.filter { !exclude_samples.contains(it[0]) }
 reads_ch.into { unaligned_reads; stats_reads; ercc_in}
 reads_ch = unaligned_reads
 
-if (params.kraken2_db == "") {
-    // skip kraken
-    kraken2_reads_in = Channel.empty()
-    kraken2_db = Channel.empty()
+if (params.kraken2_db) {
+  // send reads to kraken, and empty the reads channel
+  kraken2_reads_in = reads_ch
+  reads_ch = Channel.empty()
+  if (hasExtension(params.kraken2_db, 'gz')) {
+    kraken2_db_gz = Channel
+        .fromPath(params.kraken2_db, checkIfExists: true)
+        .ifEmpty { exit 1, "Kraken2 database not found: ${params.kraken2_db}" }
+  } else{
+    kraken2_db = Channel
+        .fromPath(params.kraken2_db, checkIfExists: true)
+        .ifEmpty { exit 1, "Kraken2 database not found: ${params.kraken2_db}" }
+  }
 } else {
-    // send reads to kraken, and empty the reads channel
-    kraken2_reads_in = reads_ch
-    reads_ch = Channel.empty()
-    kraken2_db = file(params.kraken2_db, checkIfExists: true)
+  // skip kraken
+  kraken2_reads_in = Channel.empty()
+  kraken2_db = Channel.empty()
+
 }
+
+if (hasExtension(params.kraken2_db, 'gz')) {
+  process gunzip_kraken_db {
+      tag "$gz"
+      publishDir path: { params.saveReference ? "${params.outdir}/kraken_db" : params.outdir },
+                 saveAs: { params.saveReference ? it : null }, mode: 'copy'
+
+      input:
+      file gz from kraken2_db_gz
+
+      output:
+      file "${gz.simpleName}" into kraken2_db
+
+      script:
+      // Use tar as the star indices are a folder, not a file
+      """
+      tar -xzvf ${gz}
+      """
+  }
+}
+
 
 ercc_fasta = file(params.ercc_fasta, checkIfExists: true)
 
@@ -530,4 +560,10 @@ process multiqc {
         ${trim_galore_results} \
         ${bcftools_stats}
     """
+}
+
+
+// Check file extension
+def hasExtension(it, extension) {
+    it.toString().toLowerCase().endsWith(extension.toLowerCase())
 }
