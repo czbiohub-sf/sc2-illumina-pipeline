@@ -1,0 +1,81 @@
+name: nf-core CI
+# This workflow is triggered on pushes and PRs to the repository.
+# It runs the pipeline with the minimal test dataset to check that it completes without any syntax errors
+on: [push, pull_request]
+
+jobs:
+  test:
+    env:
+      NXF_VER: ${{ matrix.nxf_ver }}
+      NXF_ANSI_LOG: false
+      NXF_RUN: "nextflow run -resume"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Nextflow versions: check pipeline minimum and current latest
+        nxf_ver: ['19.10.0', '']
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Nextflow
+        run: |
+          export NXF_VER=${{ matrix.nxf_ver }}
+          wget -qO- get.nextflow.io | bash
+          sudo mv nextflow /usr/local/bin/
+      - name: Pull docker image
+        run: |
+          docker pull czbiohub/sc2-msspe:dev && docker tag czbiohub/sc2-msspe:dev czbiohub/sc2-msspe:dev
+      - name: Run pipeline with test data (single-end fastq input)
+        run: |
+          # TODO nf-core: You can customise CI pipeline run tests as required
+          # (eg. adding multiple test runs with different parameters)
+          ${NXF_RUN} ${GITHUB_WORKSPACE} -profile test_fastq,docker
+      - name: Test downloading refseq
+        run: |
+          # TODO nf-core: You can customise CI pipeline run tests as required
+          # (eg. adding multiple test runs with different parameters)
+          ${NXF_RUN} ${GITHUB_WORKSPACE} -profile test_download_refseq,docker
+      - name: Test using existing database
+        run: |
+          # TODO nf-core: You can customise CI pipeline run tests as required
+          # (eg. adding multiple test runs with different parameters)
+          ${NXF_RUN} ${GITHUB_WORKSPACE} -profile test_existing_database,docker
+      - name: Test bam
+        run: |
+          # TODO nf-core: You can customise CI pipeline run tests as required
+          # (eg. adding multiple test runs with different parameters)
+          ${NXF_RUN} ${GITHUB_WORKSPACE} -profile test_bam,docker
+      - name: Test input is protein
+        run: |
+          # TODO nf-core: You can customise CI pipeline run tests as required
+          # (eg. adding multiple test runs with different parameters)
+          ${NXF_RUN} ${GITHUB_WORKSPACE} -profile test_input_is_protein,docker
+      - name: Test hash2kmer
+        run: |
+          # TODO nf-core: You can customise CI pipeline run tests as required
+          # (eg. adding multiple test runs with different parameters)
+          ${NXF_RUN} ${GITHUB_WORKSPACE} -profile test_hash2kmer,docker
+      - name: Test differential hash expression
+        run: |
+          # TODO nf-core: You can customise CI pipeline run tests as required
+          # (eg. adding multiple test runs with different parameters)
+          ${NXF_RUN} ${GITHUB_WORKSPACE} -profile test_diff_hash,docker
+      - name: Test differential hash expression with abundance
+        run: |
+          # TODO nf-core: You can customise CI pipeline run tests as required
+          # (eg. adding multiple test runs with different parameters)
+          ${NXF_RUN} ${GITHUB_WORKSPACE} -profile test_diff_hash,docker --with_abundance
+      - name: Test sourmash search
+        run: |
+          # TODO nf-core: You can customise CI pipeline run tests as required
+          # (eg. adding multiple test runs with different parameters)
+          ${NXF_RUN} ${GITHUB_WORKSPACE} -profile test_sourmash_search,docker
+      - name: Test sourmash search with differential hash expression
+        run: |
+          # TODO nf-core: You can customise CI pipeline run tests as required
+          # (eg. adding multiple test runs with different parameters)
+          ${NXF_RUN} ${GITHUB_WORKSPACE} -profile test_diff_hash_sourmash,docker
+      - name: Test differential hash, only searching sourmash for unaligned hashes
+        run: |
+          # TODO nf-core: You can customise CI pipeline run tests as required
+          # (eg. adding multiple test runs with different parameters)
+          ${NXF_RUN} ${GITHUB_WORKSPACE} -profile test_diff_hash_is_aligned,docker
