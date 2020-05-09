@@ -96,8 +96,7 @@ if (params.kraken2_db) {
 if (hasExtension(params.kraken2_db, 'gz')) {
   process gunzip_kraken_db {
       tag "$gz"
-      publishDir path: { params.saveReference ? "${params.outdir}/kraken_db" : params.outdir },
-                 saveAs: { params.saveReference ? it : null }, mode: 'copy'
+      publishDir "${params.outdir}/kraken_db", mode: 'copy'
 
       input:
       file gz from kraken2_db_gz
