@@ -19,7 +19,37 @@ nextflow run call_consensus.nf -profile docker \
     --outdir 's3://path/to/outdir'
 ```
 
-TODO Describe outputs
+## Outputs
+
+Below is a non-exhaustive list of the outputs from the `call_consensus.nf` pipeline.
+
+```
+├── combined.fa
+├── combined.vcf
+├── filtered.fa
+├── call_consensus-stats
+│   ├── combined.stats.tsv
+│   └── filtered.stats.tsv
+├── MultiQC
+│   └── multiqc_report.html
+├── aligned-reads
+│   ├── sample1.primertrimmed.bam
+│   ├── sample1.primertrimmed.bam.bai
+│   ├── sample2.primertrimmed.bam
+│   └── ...
+├── coverage-plots
+│   ├── sample1.depths.png
+│   ├── sample2.depths.bam
+│   └── ...
+├── trimmed-reads
+│   ├── sample1_1_val_1.fq.gz
+│   ├── sample1_2_val_2.fq.gz
+│   ├── sample2_1_val_1.fq.gz
+│   ├── sample2_2_val_2.fq.gz
+│   └── ...
+```
+
+- `combined.fa`: List of all fasta sequences
 
 # Testing
 
