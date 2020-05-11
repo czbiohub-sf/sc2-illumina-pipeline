@@ -59,7 +59,7 @@ Below is a non-exhaustive list of the outputs from the `call_consensus.nf` pipel
 - `call_consensus-stats`: Folder containing basic QC stats for consensus genomes.
 - `MultiQC/multiqc_report.html`: QC report from MultiQC (aggregates stats from quast,
   samtools, trim-galore, bcftools).
-- `aligned-reads`:
+- `aligned-reads`: Bamfile of trimmed reads mapping to reference.
 
 # Testing
 
