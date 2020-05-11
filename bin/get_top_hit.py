@@ -32,7 +32,7 @@ if args.metadata:
     division_metadata['level'] = division_metadata.apply(check_level, axis=1)
 sequence = SeqIO.read(args.assembly, 'fasta')
 # check that the query has enough sequence to BLAST
-if len(sequence)-sequence.seq.count('N') > 20:
+if len(sequence)-sequence.seq.count('N') > args.minLength/2:
     subprocess.run(" ".join(["blastn", "-db", "blast_seqs.nt", "-query",
                     args.assembly, "-num_threads", "32", "-out",
                     f"{args.sampleName}.blast.tsv", "-outfmt", "'6",
