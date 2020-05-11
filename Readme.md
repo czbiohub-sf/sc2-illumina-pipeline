@@ -25,8 +25,8 @@ Below is a non-exhaustive list of the outputs from the `call_consensus.nf` pipel
 
 ```
 ├── combined.fa
-├── combined.vcf
 ├── filtered.fa
+├── combined.vcf
 ├── call_consensus-stats
 │   ├── combined.stats.tsv
 │   └── filtered.stats.tsv
@@ -49,7 +49,14 @@ Below is a non-exhaustive list of the outputs from the `call_consensus.nf` pipel
 │   └── ...
 ```
 
-- `combined.fa`: List of all fasta sequences
+- `combined.fa`: Fasta of consensus sequences for all samples.
+- `filtered.fa`: Fasta of consensus sequences for samples passing
+  filters (default: require 25000 nonmissing genome).
+- `combined.vcf`: VCF of variants for all samples.
+- `call_consensus-stats`: Folder containing basic QC stats for consensus genomes.
+- `MultiQC/multiqc_report.html`: QC report from MultiQC (aggregates stats from quast,
+  samtools, trim-galore, bcftools).
+- `aligned-reads`:
 
 # Testing
 
@@ -69,7 +76,7 @@ nextflow run call_consensus.nf --profile docker,benchmark
 
 # Analysis pipeline
 
-TODO
+`run_analysis.nf` runs the nextstrain augur/auspice pipeline, as well as several other ad hoc analyses. (To be refactored soon).
 
 # Pipeline Overview
 
