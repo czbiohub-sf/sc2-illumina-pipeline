@@ -1,0 +1,16 @@
+name: Build Docker images
+# This workflow tests building the docker image so I stop committing
+# bad Dockerfiles and breaking the build
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Build Docker images
+        uses: docker/build-push-action@v1.0.1
+        with:
+          repository: czbiohub/sc2-msspe
+          push: false
