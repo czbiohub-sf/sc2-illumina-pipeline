@@ -9,10 +9,11 @@ def helpMessage() {
 
     Mandatory arguments:
       -profile                      Configuration profile to use. Can use multiple (comma separated)
-                                    Available: conda, docker, singularity, awsbatch, test and more.
+				    Available: conda, docker, singularity, awsbatch, test and more.
       --reads                       Path to reads, must be in quotes
       --primers                     Path to BED file of primers (default: data/SARS-COV-2_spikePrimers.bed)
       --ref                         Path to FASTA reference sequence (default: data/MN908947.3.fa)
+      --ref_host                    Path to FASTA for host reference genome (default: data/human_chr1.fa)
 
     Consensus calling options:
       --kraken2_db                  Path to kraken db (default: "")
@@ -45,25 +46,26 @@ if (params.help) {
 multiqc_config = file(params.multiqc_config, checkIfExists: true)
 
 ref_fasta = file(params.ref, checkIfExists: true)
+ref_host = file(params.ref_host, checkIfExists: true)
 ref_gb = file(params.ref_gb, checkIfExists: true)
 primer_bed = file(params.primers, checkIfExists: true)
 
 if (params.readPaths) {
     if (params.single_end){
-        Channel
-        .fromList(params.readPaths)
-        .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true)] ] }
-        .set { reads_ch }
+	Channel
+	.fromList(params.readPaths)
+	.map { row -> [ row[0], [ file(row[1][0], checkIfExists: true)] ] }
+	.set { reads_ch }
     } else {
-        Channel
-        .fromList(params.readPaths)
-        .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true), file(row[1][1], checkIfExists: true) ] ] }
-        .set { reads_ch }
+	Channel
+	.fromList(params.readPaths)
+	.map { row -> [ row[0], [ file(row[1][0], checkIfExists: true), file(row[1][1], checkIfExists: true) ] ] }
+	.set { reads_ch }
     }
 } else {
     Channel
-        .fromFilePairs(params.reads, size: params.single_end ? 1 : 2)
-        .set { reads_ch }
+	.fromFilePairs(params.reads, size: params.single_end ? 1 : 2)
+	.set { reads_ch }
 }
 
 // remove excluded samples from reads_ch
@@ -79,12 +81,12 @@ if (params.kraken2_db) {
   reads_ch = Channel.empty()
   if (hasExtension(params.kraken2_db, 'gz')) {
     kraken2_db_gz = Channel
-        .fromPath(params.kraken2_db, checkIfExists: true)
-        .ifEmpty { exit 1, "Kraken2 database not found: ${params.kraken2_db}" }
+	.fromPath(params.kraken2_db, checkIfExists: true)
+	.ifEmpty { exit 1, "Kraken2 database not found: ${params.kraken2_db}" }
   } else{
     kraken2_db = Channel
-        .fromPath(params.kraken2_db, checkIfExists: true)
-        .ifEmpty { exit 1, "Kraken2 database not found: ${params.kraken2_db}" }
+	.fromPath(params.kraken2_db, checkIfExists: true)
+	.ifEmpty { exit 1, "Kraken2 database not found: ${params.kraken2_db}" }
   }
 } else {
   // skip kraken
@@ -112,7 +114,6 @@ if (hasExtension(params.kraken2_db, 'gz')) {
   }
 }
 
-
 ercc_fasta = file(params.ercc_fasta, checkIfExists: true)
 
 process quantifyERCCs {
@@ -129,11 +130,35 @@ process quantifyERCCs {
 
   script:
   """
-  minimap2 -ax sr ${ercc_fasta} ${reads} |
-    samtools view -bo ercc_mapped.bam
-  samtools stats ercc_mapped.bam > ${sampleName}.ercc_stats
+  minimap2 -t ${task.cpus-1} -ax sr ${ercc_fasta} ${reads} |
+    samtools view -@ ${task.cpus-1} -bo ercc_mapped.bam
+  samtools stats -@ ${task.cpus-1} ercc_mapped.bam > ${sampleName}.ercc_stats
   """
 }
+
+process filterRefReads {
+    tag { sampleName }
+    label 'process_large'
+
+    input:
+    path(ref_host)
+    tuple(sampleName, file(reads)) from kraken2_reads_in
+
+    output:
+    tuple(sampleName, file("${sampleName}_no_host_*.fq.gz")) into no_host_reads_out
+
+    script:
+    """
+    set -e -o pipefail
+
+    minimap2 -t ${task.cpus-1} -ax sr ${ref_host} ${reads} | \
+    samtools view -@ ${task.cpus-1} -b -f 4 | \
+    samtools fastq -@ ${task.cpus-1} -1 ${sampleName}_no_host_1.fq.gz -2 ${sampleName}_no_host_2.fq.gz -0 /dev/null -s /dev/null -n -c 6 -
+    """
+}
+
+kraken2_reads_no_host_in = reads_ch.concat(no_host_reads_out)
+reads_ch = Channel.empty()
 
 process filterReads {
     tag { sampleName }
@@ -142,14 +167,14 @@ process filterReads {
     input:
     path(db) from kraken2_db.collect()
     path(ref_fasta)
-    tuple(sampleName, file(reads)) from kraken2_reads_in
+    tuple(sampleName, file(reads)) from kraken2_reads_no_host_in
 
     output:
     tuple(sampleName, file("${sampleName}_covid_*.fq.gz")) into kraken2_reads_out
 
     script:
     """
-    minimap2 -ax sr ${ref_fasta} ${reads} |
+    minimap2 -t ${task.cpus-1} -ax sr ${ref_fasta} ${reads} |
       samtools sort -@ ${task.cpus-1} -n -O bam -o mapped.bam
     samtools fastq -@ ${task.cpus-1} -G 12 -1 paired1.fq.gz -2 paired2.fq.gz \
        -0 /dev/null -s /dev/null -n -c 6 \
@@ -159,31 +184,31 @@ process filterReads {
     LINES=\$(zcat paired1.fq.gz | wc -l)
     if [ "\$LINES" -gt 0 ];
     then
-        kraken2 --db ${db} \
-          --threads ${task.cpus} \
-          --report ${sampleName}.kraken2_report \
-          --classified-out "${sampleName}_classified#.fq" \
-          --output - \
-          --memory-mapping --gzip-compressed --paired \
-          paired1.fq.gz paired2.fq.gz
+	kraken2 --db ${db} \
+	  --threads ${task.cpus} \
+	  --report ${sampleName}.kraken2_report \
+	  --classified-out "${sampleName}_classified#.fq" \
+	  --output - \
+	  --memory-mapping --gzip-compressed --paired \
+	  paired1.fq.gz paired2.fq.gz
 
-        rm paired1.fq.gz paired2.fq.gz
+	rm paired1.fq.gz paired2.fq.gz
 
-        grep --no-group-separator -A3 "kraken:taxid|2697049" \
-             ${sampleName}_classified_1.fq \
-             > ${sampleName}_covid_1.fq || [[ \$? == 1 ]]
+	grep --no-group-separator -A3 "kraken:taxid|2697049" \
+	     ${sampleName}_classified_1.fq \
+	     > ${sampleName}_covid_1.fq || [[ \$? == 1 ]]
 
-        grep --no-group-separator -A3 "kraken:taxid|2697049" \
-             ${sampleName}_classified_2.fq \
-             > ${sampleName}_covid_2.fq || [[ \$? == 1 ]]
+	grep --no-group-separator -A3 "kraken:taxid|2697049" \
+	     ${sampleName}_classified_2.fq \
+	     > ${sampleName}_covid_2.fq || [[ \$? == 1 ]]
 
-        gzip ${sampleName}_covid_1.fq
-        gzip ${sampleName}_covid_2.fq
+	gzip ${sampleName}_covid_1.fq
+	gzip ${sampleName}_covid_2.fq
 
-        rm ${sampleName}_classified_*.fq
+	rm ${sampleName}_classified_*.fq
     else
-        mv paired1.fq.gz ${sampleName}_covid_1.fq.gz
-        mv paired2.fq.gz ${sampleName}_covid_2.fq.gz
+	mv paired1.fq.gz ${sampleName}_covid_1.fq.gz
+	mv paired2.fq.gz ${sampleName}_covid_2.fq.gz
     fi
     """
 }
@@ -204,7 +229,7 @@ process trimReads {
     tag { sampleName }
     label 'process_medium'
     publishDir "${params.outdir}/trimmed-reads", mode: 'copy',
-        saveAs: { x -> x.endsWith(".fq.gz") ? x : null }
+	saveAs: { x -> x.endsWith(".fq.gz") ? x : null }
 
     cpus 2
 
@@ -220,15 +245,15 @@ process trimReads {
     LINES=\$(zcat ${reads[0]} | wc -l)
     if [ "\$LINES" -gt 0 ];
     then
-        trim_galore --fastqc --paired ${reads}
-        TRIMMED=\$(zcat ${sampleName}_covid_1_val_1.fq.gz | wc -l)
-        if [ "\$TRIMMED" == 0 ];
-        then
-            rm -r *fastqc.zip
-        fi
+	trim_galore --fastqc --paired ${reads}
+	TRIMMED=\$(zcat ${sampleName}_covid_1_val_1.fq.gz | wc -l)
+	if [ "\$TRIMMED" == 0 ];
+	then
+	    rm -r *fastqc.zip
+	fi
     else
-        cp ${reads[0]} ${sampleName}_covid_1_val_1.fq.gz
-        cp ${reads[1]} ${sampleName}_covid_2_val_2.fq.gz
+	cp ${reads[0]} ${sampleName}_covid_1_val_1.fq.gz
+	cp ${reads[1]} ${sampleName}_covid_2_val_2.fq.gz
     fi
     """
 }
@@ -290,7 +315,7 @@ if (!params.intrahost_variants) {
 
 process intrahostVariants {
     publishDir "${params.outdir}/",
-        mode: 'copy'
+	mode: 'copy'
     label 'process_medium'
 
     cpus params.intrahost_variants_cpu
@@ -301,19 +326,19 @@ process intrahostVariants {
 
     output:
     path("intrahost-variants." +
-         "ploidy${params.intrahost_ploidy}-" +
-         "minfrac${params.intrahost_min_frac}.vcf")
+	 "ploidy${params.intrahost_ploidy}-" +
+	 "minfrac${params.intrahost_min_frac}.vcf")
 
     script:
     """
     ls ${bam} | xargs -I % samtools index %
     samtools faidx ${ref_fasta}
     freebayes-parallel <(fasta_generate_regions.py ${ref_fasta}.fai 1000) ${task.cpus} \
-        --ploidy ${params.intrahost_ploidy} \
-        --min-alternate-fraction ${params.intrahost_min_frac} \
-        -f ${ref_fasta} ${bam} |
-        bcftools view -g het \
-        > intrahost-variants.ploidy${params.intrahost_ploidy}-minfrac${params.intrahost_min_frac}.vcf
+	--ploidy ${params.intrahost_ploidy} \
+	--min-alternate-fraction ${params.intrahost_min_frac} \
+	-f ${ref_fasta} ${bam} |
+	bcftools view -g het \
+	> intrahost-variants.ploidy${params.intrahost_ploidy}-minfrac${params.intrahost_min_frac}.vcf
     """
 }
 
@@ -428,15 +453,15 @@ process computeStats {
     tag { sampleName }
     label 'process_small'
     publishDir "${params.outdir}/coverage-plots", mode: 'copy',
-        saveAs: { x -> x.endsWith(".png") ? x : null }
+	saveAs: { x -> x.endsWith(".png") ? x : null }
 
     input:
     tuple(sampleName,
-          file(reads),
-          file(trimmed_filtered_bam),
-          file(in_fa),
-          file(ercc_stats),
-          file(vcf)) from stats_ch_in
+	  file(reads),
+	  file(trimmed_filtered_bam),
+	  file(in_fa),
+	  file(ercc_stats),
+	  file(vcf)) from stats_ch_in
 
     output:
     file("${sampleName}.samtools_stats") into samtools_stats_out
@@ -448,14 +473,14 @@ process computeStats {
     samtools index ${trimmed_filtered_bam}
     samtools stats ${trimmed_filtered_bam} > ${sampleName}.samtools_stats
     alignment_assembly_stats.py \
-        --sample_name ${sampleName} \
-        --cleaned_bam ${trimmed_filtered_bam} \
-        --ercc_stats ${ercc_stats} \
-        --samtools_stats ${sampleName}.samtools_stats \
-        --assembly ${in_fa} \
-        --vcf ${vcf} \
-        --out_prefix ${sampleName} \
-        --reads ${reads}
+	--sample_name ${sampleName} \
+	--cleaned_bam ${trimmed_filtered_bam} \
+	--ercc_stats ${ercc_stats} \
+	--samtools_stats ${sampleName}.samtools_stats \
+	--assembly ${in_fa} \
+	--vcf ${vcf} \
+	--out_prefix ${sampleName} \
+	--reads ${reads}
     """
 }
 
@@ -527,10 +552,10 @@ process filterAssemblies {
     script:
     """
     filter_assemblies.py \
-        --max_n ${params.maxNs} --min_len ${params.minLength} \
-        --stats ${merged_stats} --fasta ${merged_assemblies} \
-        --vcf ${vcf} \
-        --out_prefix filtered
+	--max_n ${params.maxNs} --min_len ${params.minLength} \
+	--stats ${merged_stats} --fasta ${merged_assemblies} \
+	--vcf ${vcf} \
+	--out_prefix filtered
     """
 }
 
@@ -554,10 +579,10 @@ process multiqc {
     script:
     """
     multiqc -f -ip --config ${multiqc_config} \
-        ${samtools_stats} \
-        quast_results/ \
-        ${trim_galore_results} \
-        ${bcftools_stats}
+	${samtools_stats} \
+	quast_results/ \
+	${trim_galore_results} \
+	${bcftools_stats}
     """
 }
 
