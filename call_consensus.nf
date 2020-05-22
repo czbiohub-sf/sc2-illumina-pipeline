@@ -75,6 +75,30 @@ reads_ch = reads_ch.filter { !exclude_samples.contains(it[0]) }
 reads_ch.into { unaligned_reads; stats_reads; ercc_in}
 reads_ch = unaligned_reads
 
+reads_to_remove_host_in = reads_ch
+reads_ch = Channel.empty()
+
+process filterRefReads {
+    tag { sampleName }
+    label 'process_large'
+
+    input:
+    path(ref_host)
+    tuple(sampleName, file(reads)) from reads_to_remove_host_in
+
+    output:
+    tuple(sampleName, file("${sampleName}_no_host_*.fq.gz")) into reads_host_removed_out
+
+    script:
+    """
+    minimap2 -t ${task.cpus-1} -ax sr ${ref_host} ${reads} | \
+    samtools view -@ ${task.cpus-1} -b -f 4 | \
+    samtools fastq -@ ${task.cpus-1} -1 ${sampleName}_no_host_1.fq.gz -2 ${sampleName}_no_host_2.fq.gz -0 /dev/null -s /dev/null -n -c 6 -
+    """
+}
+
+reads_ch = reads_ch.mix(reads_host_removed_out)
+
 if (params.kraken2_db) {
   // send reads to kraken, and empty the reads channel
   kraken2_reads_in = reads_ch
@@ -136,28 +160,6 @@ process quantifyERCCs {
   """
 }
 
-process filterRefReads {
-    tag { sampleName }
-    label 'process_large'
-
-    input:
-    path(ref_host)
-    tuple(sampleName, file(reads)) from kraken2_reads_in
-
-    output:
-    tuple(sampleName, file("${sampleName}_no_host_*.fq.gz")) into no_host_reads_out
-
-    script:
-    """
-    minimap2 -t ${task.cpus-1} -ax sr ${ref_host} ${reads} | \
-    samtools view -@ ${task.cpus-1} -b -f 4 | \
-    samtools fastq -@ ${task.cpus-1} -1 ${sampleName}_no_host_1.fq.gz -2 ${sampleName}_no_host_2.fq.gz -0 /dev/null -s /dev/null -n -c 6 -
-    """
-}
-
-kraken2_reads_no_host_in = reads_ch.mix(no_host_reads_out)
-reads_ch = Channel.empty()
-
 process filterReads {
     tag { sampleName }
     label 'process_large'
@@ -165,7 +167,7 @@ process filterReads {
     input:
     path(db) from kraken2_db.collect()
     path(ref_fasta)
-    tuple(sampleName, file(reads)) from kraken2_reads_no_host_in
+    tuple(sampleName, file(reads)) from kraken2_reads_in
 
     output:
     tuple(sampleName, file("${sampleName}_covid_*.fq.gz")) into kraken2_reads_out
