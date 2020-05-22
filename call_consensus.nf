@@ -9,7 +9,7 @@ def helpMessage() {
 
     Mandatory arguments:
       -profile                      Configuration profile to use. Can use multiple (comma separated)
-				    Available: conda, docker, singularity, awsbatch, test and more.
+                                    Available: conda, docker, singularity, awsbatch, test and more.
       --reads                       Path to reads, must be in quotes
       --primers                     Path to BED file of primers (default: data/SARS-COV-2_spikePrimers.bed)
       --ref                         Path to FASTA reference sequence (default: data/MN908947.3.fa)
@@ -149,15 +149,13 @@ process filterRefReads {
 
     script:
     """
-    set -e -o pipefail
-
     minimap2 -t ${task.cpus-1} -ax sr ${ref_host} ${reads} | \
     samtools view -@ ${task.cpus-1} -b -f 4 | \
     samtools fastq -@ ${task.cpus-1} -1 ${sampleName}_no_host_1.fq.gz -2 ${sampleName}_no_host_2.fq.gz -0 /dev/null -s /dev/null -n -c 6 -
     """
 }
 
-kraken2_reads_no_host_in = reads_ch.concat(no_host_reads_out)
+kraken2_reads_no_host_in = reads_ch.mix(no_host_reads_out)
 reads_ch = Channel.empty()
 
 process filterReads {
