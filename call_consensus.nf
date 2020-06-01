@@ -371,8 +371,9 @@ process callVariants {
     path(ref_fasta)
 
     output:
-    tuple(sampleName, path("${sampleName}.vcf")) into (stats_vcf, individual_vcfs)
+    tuple(sampleName, path("${sampleName}.vcf.gz")) into (stats_vcf, individual_vcfs)
     path("${sampleName}.bcftools_stats") into bcftools_stats_ch
+    path("${sampleName}.vcf.gz.tbi")
 
     script:
     """
@@ -380,7 +381,9 @@ process callVariants {
         bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - |
         bcftools view -i 'DP>=${params.minDepth}' \
         > ${sampleName}.vcf
-    bcftools stats ${sampleName}.vcf > ${sampleName}.bcftools_stats
+    bgzip ${sampleName}.vcf
+    tabix ${sampleName}.vcf.gz
+    bcftools stats ${sampleName}.vcf.gz > ${sampleName}.bcftools_stats
     """
 }
 
@@ -448,10 +451,9 @@ process combinedVariants {
 
     script:
     """
-    printf "%s\\n" ${vcfs} | xargs -I % bgzip %
-    printf "%s\\n" ${vcfs} | xargs -I % tabix %.gz
+    printf "%s\\n" ${vcfs} | xargs -I % tabix %
     printf "%s\\n" ${in_bams} | xargs -I % samtools index %
-    bcftools merge \$(printf "%s.gz\n" ${vcfs}) | bcftools query -f '%CHROM\\t%POS\\t%END\\n' > variant_positions.txt
+    bcftools merge \$(printf "%s\n" ${vcfs}) | bcftools query -f '%CHROM\\t%POS\\t%END\\n' > variant_positions.txt
     split -e -n l/${task.cpus} variant_positions.txt split_regions_
     ls split_regions_* |
         parallel -I % -j ${Math.ceil(task.cpus/2) as int} \
