@@ -426,8 +426,13 @@ process computeStats {
     """
 }
 
-combined_variants_bams = combined_variants_bams.map { it[1] }.collect()
-individual_vcfs = individual_vcfs.map { it[1] }.collect()
+if (!params.joint_variant_calling) {
+    combined_variants_bams = Channel.empty()
+    individual_vcfs = Channel.empty()
+} else {
+    combined_variants_bams = combined_variants_bams.map { it[1] }.collect()
+    individual_vcfs = individual_vcfs.map { it[1] }.collect()
+}
 
 process combinedVariants {
     publishDir "${params.outdir}", mode: 'copy'
@@ -499,7 +504,6 @@ process filterAssemblies {
     input:
     path(merged_stats) from merged_stats_ch
     path(merged_assemblies) from merged_assemblies_ch
-    path(vcf) from combined_variants_vcf
 
     output:
     path("filtered.stats.tsv")
@@ -510,7 +514,6 @@ process filterAssemblies {
     filter_assemblies.py \
 	--max_n ${params.maxNs} --min_len ${params.minLength} \
 	--stats ${merged_stats} --fasta ${merged_assemblies} \
-	--vcf ${vcf} \
 	--out_prefix filtered
     """
 }
