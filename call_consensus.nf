@@ -305,7 +305,8 @@ process trimPrimers {
     """
 }
 
-trimmed_bam_ch.into { quast_bam; consensus_bam; stats_bam; intrahost_bam }
+trimmed_bam_ch.into { quast_bam; consensus_bam; stats_bam; intrahost_bam;
+                     call_variants_bam; combined_variants_bams }
 
 if (!params.intrahost_variants) {
     intrahost_bam = Channel.empty()
@@ -345,7 +346,7 @@ process intrahostVariants {
 process makeConsensus {
   tag { sampleName }
   publishDir "${params.outdir}/consensus-seqs", mode: 'copy'
-  label 'process_large'
+  label 'process_pileup'
 
   input:
   tuple(sampleName, path(bam)) from consensus_bam
@@ -395,49 +396,25 @@ process quast {
    """
 }
 
-process realignConsensus {
-    tag { sampleName }
-    label 'process_medium'
-    publishDir "${params.outdir}/realigned-seqs", mode: 'copy'
-
-    input:
-    tuple(sampleName, path(in_fa)) from realign_fa
-    path(ref_fasta)
-
-    output:
-    tuple(sampleName, path("${sampleName}.realigned.bam")) into realigned_bam
-    path("${sampleName}.realigned.bam.bai")
-
-    script:
-    """
-    minimap2 -ax asm5 -R '@RG\\tID:${sampleName}\\tSM:${sampleName}' \
-      ${ref_fasta} ${in_fa} |
-      samtools sort -O bam -o ${sampleName}.realigned.bam
-    samtools index ${sampleName}.realigned.bam
-    """
-}
-
-realigned_bam.into { call_variants_bam; combined_variants_bams }
-combined_variants_bams = combined_variants_bams.map { it[1] }.collect()
-
 process callVariants {
     tag { sampleName }
-    label 'process_medium'
+    label 'process_pileup'
     publishDir "${params.outdir}/sample-variants", mode: 'copy'
 
     input:
-    tuple(sampleName, path(in_bam)) from call_variants_bam
+    tuple(sampleName, path(in_bams)) from call_variants_bam
     path(ref_fasta)
 
     output:
-    tuple(sampleName, path("${sampleName}.vcf")) into variants_ch
+    tuple(sampleName, path("${sampleName}.vcf")) into (stats_vcf, individual_vcfs)
     path("${sampleName}.bcftools_stats") into bcftools_stats_ch
 
     script:
     """
-    bcftools mpileup -f ${ref_fasta} ${in_bam} |
-      bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
-      > ${sampleName}.vcf
+    bcftools mpileup -a FORMAT/AD -f ${ref_fasta} ${in_bams} |
+        bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - |
+        bcftools view -i 'DP>=${params.minDepth}' \
+        > ${sampleName}.vcf
     bcftools stats ${sampleName}.vcf > ${sampleName}.bcftools_stats
     """
 }
@@ -446,7 +423,7 @@ stats_reads
     .join(stats_bam)
     .join(stats_fa)
     .join(ercc_out)
-    .join(variants_ch)
+    .join(stats_vcf)
     .set { stats_ch_in }
 
 process computeStats {
@@ -484,12 +461,16 @@ process computeStats {
     """
 }
 
+combined_variants_bams = combined_variants_bams.map { it[1] }.collect()
+individual_vcfs = individual_vcfs.map { it[1] }.collect()
+
 process combinedVariants {
     publishDir "${params.outdir}", mode: 'copy'
-    label 'process_medium'
+    label 'process_pileup'
 
     input:
     path(in_bams) from combined_variants_bams
+    path(vcfs) from individual_vcfs
     path(ref_fasta)
 
     output:
@@ -497,11 +478,17 @@ process combinedVariants {
 
     script:
     """
-    bcftools mpileup -f ${ref_fasta} ${in_bams} |
-      bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
-      > combined.vcf
+    printf "%s\\n" ${vcfs} | xargs -I % bgzip %
+    printf "%s\\n" ${vcfs} | xargs -I % tabix %.gz
+    printf "%s\\n" ${in_bams} | xargs -I % samtools index %
+    bcftools merge \$(printf "%s.gz\n" ${vcfs}) | bcftools query -f '%CHROM\\t%POS\\t%END\\n' > variant_positions.txt
+    bcftools mpileup -a FORMAT/DP,FORMAT/AD -f ${ref_fasta} \
+        -R variant_positions.txt ${in_bams} |
+        bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
+        > combined.vcf
     """
 }
+
 
 process mergeAllAssemblies {
     publishDir "${params.outdir}", mode: 'copy'
