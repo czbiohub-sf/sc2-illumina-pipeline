@@ -431,7 +431,7 @@ individual_vcfs = individual_vcfs.map { it[1] }.collect()
 
 process combinedVariants {
     publishDir "${params.outdir}", mode: 'copy'
-    label 'process_pileup'
+    label 'process_large'
 
     input:
     path(in_bams) from combined_variants_bams
@@ -447,10 +447,14 @@ process combinedVariants {
     printf "%s\\n" ${vcfs} | xargs -I % tabix %.gz
     printf "%s\\n" ${in_bams} | xargs -I % samtools index %
     bcftools merge \$(printf "%s.gz\n" ${vcfs}) | bcftools query -f '%CHROM\\t%POS\\t%END\\n' > variant_positions.txt
-    bcftools mpileup -a FORMAT/DP,FORMAT/AD -f ${ref_fasta} \
-        -R variant_positions.txt ${in_bams} |
+    split -e -n l/${task.cpus} variant_positions.txt split_regions_
+    ls split_regions_* |
+        parallel -I % -j ${Math.ceil(task.cpus/2) as int} \
+        'bcftools mpileup -a FORMAT/DP,FORMAT/AD -f ${ref_fasta} \
+        -R % ${in_bams} |
         bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
-        > combined.vcf
+        > %.vcf'
+    bcftools concat split_regions_*.vcf > combined.vcf
     """
 }
 
