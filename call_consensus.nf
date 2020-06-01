@@ -305,43 +305,8 @@ process trimPrimers {
     """
 }
 
-trimmed_bam_ch.into { quast_bam; consensus_bam; stats_bam; intrahost_bam;
+trimmed_bam_ch.into { quast_bam; consensus_bam; stats_bam;
                      call_variants_bam; combined_variants_bams }
-
-if (!params.intrahost_variants) {
-    intrahost_bam = Channel.empty()
-} else {
-    intrahost_bam = intrahost_bam.map { it[1] }.collect()
-}
-
-process intrahostVariants {
-    publishDir "${params.outdir}/",
-	mode: 'copy'
-    label 'process_medium'
-
-    cpus params.intrahost_variants_cpu
-
-    input:
-    path(bam) from intrahost_bam
-    path(ref_fasta)
-
-    output:
-    path("intrahost-variants." +
-	 "ploidy${params.intrahost_ploidy}-" +
-	 "minfrac${params.intrahost_min_frac}.vcf")
-
-    script:
-    """
-    ls ${bam} | xargs -I % samtools index %
-    samtools faidx ${ref_fasta}
-    freebayes-parallel <(fasta_generate_regions.py ${ref_fasta}.fai 1000) ${task.cpus} \
-	--ploidy ${params.intrahost_ploidy} \
-	--min-alternate-fraction ${params.intrahost_min_frac} \
-	-f ${ref_fasta} ${bam} |
-	bcftools view -g het \
-	> intrahost-variants.ploidy${params.intrahost_ploidy}-minfrac${params.intrahost_min_frac}.vcf
-    """
-}
 
 process makeConsensus {
   tag { sampleName }
