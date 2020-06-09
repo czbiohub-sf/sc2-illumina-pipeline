@@ -28,4 +28,4 @@ jobs:
         run: |
           # TODO nf-core: You can customise CI pipeline run tests as required
           # (eg. adding multiple test runs with different parameters)
-          ${NXF_RUN} ${GITHUB_WORKSPACE}/call_consensus.nf -profile test,docker
+          ${NXF_RUN} ${GITHUB_WORKSPACE} -profile test,docker
