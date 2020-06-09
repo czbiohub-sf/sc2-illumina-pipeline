@@ -11,7 +11,7 @@ files. We are using it on the following types of sequencing data:
 For generating consensus genomes from reads:
 
 ```{sh}
-nextflow run call_consensus.nf -profile docker \
+nextflow run main.nf -profile docker \
     --reads '[s3://]path/to/reads/*_R{1,2}_001.fastq.gz*' \
     --kraken2_db '[s3://]path/to/kraken2db' \
     --outdir '[s3://]path/to/outdir'
@@ -21,7 +21,7 @@ The kraken2db can be downloaded from https://genexa.ch/sars2-bioinformatics-reso
 
 ## Outputs
 
-Below is a non-exhaustive list of the outputs from the `call_consensus.nf` pipeline.
+Below is a non-exhaustive list of the outputs from the `main.nf` pipeline.
 
 ```
 ├── combined.fa
@@ -63,7 +63,7 @@ Below is a non-exhaustive list of the outputs from the `call_consensus.nf` pipel
 Simple test to make sure things aren't broken:
 
 ```{sh}
-nextflow run call_consensus.nf -profile docker,test
+nextflow run main.nf -profile docker,test
 ```
 
 # Benchmarking
@@ -71,7 +71,7 @@ nextflow run call_consensus.nf -profile docker,test
 Simple benchmark (for mapping, not speed). Run after algorithm changes to see how accuracy might be affected. Result in `benchmark/call_consensus-stats/combined.stats.tsv`
 
 ```{sh}
-nextflow run call_consensus.nf --profile docker,benchmark
+nextflow run main.nf --profile docker,benchmark
 ```
 
 # Analysis pipeline
