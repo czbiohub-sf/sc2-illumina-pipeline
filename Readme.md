@@ -1,20 +1,17 @@
-# SARS-CoV-2 Genomic Epidemiology Pipeline
+# SARS-CoV-2 Consensus Genome Pipeline
 
-This pipeline has two major components:
-
-1. Assembly and QC of SARs-CoV-2 genomes from raw sequencing reads (fastq files).
-2. Constructing a phylogenetic tree containing high-quality genomes from the pipeline and contextual reference genomes from GISAID.
-
-For assembly, we use a simple approach based on alignment to reference.
-
-For phylogenetics, we use the [augur](https://nextstrain.org/docs/bioinformatics/introduction-to-augur) pipeline developed by the Nextstrain team.
+This pipeline generates consensus SARS-CoV-2 genomes from fastq
+files. We are using it on the following types of sequencing data:
+1. Metagenomic sequencing enriched for SARS-CoV-2 reads
+   ([protocols.io](https://www.protocols.io/private/32717E8D59E211EABDB40242AC110003?step=4)).
+2. Amplicon-based short-read sequencing (using ARTIC v3 protocol).
 
 # Typical usage
 
 For generating consensus genomes from reads:
 
 ```{sh}
-nextflow run call_consensus.nf -profile docker \
+nextflow run main.nf -profile docker \
     --reads '[s3://]path/to/reads/*_R{1,2}_001.fastq.gz*' \
     --kraken2_db '[s3://]path/to/kraken2db' \
     --outdir '[s3://]path/to/outdir'
@@ -24,7 +21,7 @@ The kraken2db can be downloaded from https://genexa.ch/sars2-bioinformatics-reso
 
 ## Outputs
 
-Below is a non-exhaustive list of the outputs from the `call_consensus.nf` pipeline.
+Below is a non-exhaustive list of the outputs from the `main.nf` pipeline.
 
 ```
 ├── combined.fa
@@ -66,7 +63,7 @@ Below is a non-exhaustive list of the outputs from the `call_consensus.nf` pipel
 Simple test to make sure things aren't broken:
 
 ```{sh}
-nextflow run call_consensus.nf --profile docker,test
+nextflow run main.nf -profile docker,test
 ```
 
 # Benchmarking
@@ -74,25 +71,18 @@ nextflow run call_consensus.nf --profile docker,test
 Simple benchmark (for mapping, not speed). Run after algorithm changes to see how accuracy might be affected. Result in `benchmark/call_consensus-stats/combined.stats.tsv`
 
 ```{sh}
-nextflow run call_consensus.nf --profile docker,benchmark
+nextflow run main.nf --profile docker,benchmark
 ```
 
 # Analysis pipeline
 
-`run_analysis.nf` runs the nextstrain augur/auspice pipeline, as well as several other ad hoc analyses. (To be refactored soon).
+Analysis pipeline has moved here: https://github.com/czbiohub/sc2-ngs-analysis
 
 # Pipeline Overview
 
 TODO
 
-# Sequencing Protocols
-
-The current pipeline is designed to work with the MSSPE spiked primer enrichment [protocol](https://www.protocols.io/private/32717E8D59E211EABDB40242AC110003?step=4). Future versions will adapt to amplicon-based short- and long- read sequencing.
-
 # Acknowledgments
 
 Initial version of this pipeline was based on
 https://github.com/connor-lab/ncov2019-artic-nf
-
-Augur/Auspice pipeline based on
-https://github.com/nextstrain/ncov
