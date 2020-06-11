@@ -75,8 +75,14 @@ reads_ch = reads_ch.filter { !exclude_samples.contains(it[0]) }
 reads_ch.into { unaligned_reads; stats_reads; ercc_in}
 reads_ch = unaligned_reads
 
-reads_to_remove_host_in = reads_ch
-reads_ch = Channel.empty()
+if (params.skip_filter_ref) {
+    // skip trimming
+    reads_to_remove_host_in = Channel.empty()
+} else {
+    // send reads to host filtering, and empty the reads channel
+    reads_to_remove_host_in = reads_ch
+    reads_ch = Channel.empty()
+}
 
 process filterRefReads {
     tag { sampleName }
