@@ -12,5 +12,8 @@ ENV PATH /opt/conda/envs/sc2-msspe/bin/:$PATH
 # Dump the details of the installed packages to a file for posterity
 RUN conda env export --name nf-core-msspe-1.0dev > nf-core-msspe-1.0dev.yaml
 
+# Install fastv
+wget http://opengene.org/fastv/fastv && chmod a+x ./fastv && mv fastv /bin
+
 # Install baltic
 RUN pip install git+git://github.com/evogytis/baltic.git
