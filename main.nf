@@ -87,6 +87,7 @@ if (params.skip_filter_ref) {
 process filterRefReads {
     tag { sampleName }
     label 'process_large'
+    publishDir "${params.outdir}/filtered-reads"
 
     input:
     path(ref_host)
