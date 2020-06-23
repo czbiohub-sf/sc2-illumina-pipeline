@@ -9,7 +9,7 @@ def helpMessage() {
 
     Mandatory arguments:
       -profile                      Configuration profile to use. Can use multiple (comma separated)
-                                    Available: conda, docker, singularity, awsbatch, test and more.
+				    Available: conda, docker, singularity, awsbatch, test and more.
       --reads                       Path to reads, must be in quotes
       --primers                     Path to BED file of primers (default: data/SARS-COV-2_spikePrimers.bed)
       --ref                         Path to FASTA reference sequence (default: data/MN908947.3.fa)
@@ -252,7 +252,7 @@ process trimReads {
     LINES=\$(zcat ${reads[0]} | wc -l)
     if [ "\$LINES" -gt 0 ];
     then
-	trim_galore --fastqc --paired ${reads}
+	trim_galore -j ${task.cpus-1} --fastqc --paired ${reads}
 	TRIMMED=\$(zcat ${sampleName}_covid_1_val_1.fq.gz | wc -l)
 	if [ "\$TRIMMED" == 0 ];
 	then
@@ -284,7 +284,7 @@ process alignReads {
 
     script:
     """
-    minimap2 -ax sr -R '@RG\\tID:${sampleName}\\tSM:${sampleName}' ${ref_fasta} ${reads} |
+    minimap2 -t ${task.cpus-1} -ax sr -R '@RG\\tID:${sampleName}\\tSM:${sampleName}' ${ref_fasta} ${reads} |
       samtools sort -@ ${task.cpus-1} -O bam -o ${sampleName}.bam
     """
 }
@@ -304,16 +304,16 @@ process trimPrimers {
 
     script:
     """
-    samtools view -F4 -q ${params.samQualThreshold} -o ivar.bam ${alignment}
-    samtools index ivar.bam
+    samtools view -@ ${task.cpus-1} -F4 -q ${params.samQualThreshold} -o ivar.bam ${alignment}
+    samtools index -@ ${task.cpus-1} ivar.bam
     ivar trim -e -i ivar.bam -b ${primer_bed} -p ivar.out
-    samtools sort -O bam -o ${sampleName}.primertrimmed.bam ivar.out.bam
-    samtools index ${sampleName}.primertrimmed.bam
+    samtools sort -@ ${task.cpus-1} -O bam -o ${sampleName}.primertrimmed.bam ivar.out.bam
+    samtools index -@ ${task.cpus-1} ${sampleName}.primertrimmed.bam
     """
 }
 
 trimmed_bam_ch.into { quast_bam; consensus_bam; stats_bam;
-                     call_variants_bam; combined_variants_bams }
+		     call_variants_bam; combined_variants_bams }
 
 process makeConsensus {
   tag { sampleName }
@@ -328,8 +328,8 @@ process makeConsensus {
 
   script:
   """
-  samtools index ${bam}
-  samtools mpileup -A -d ${params.mpileupDepth} -Q0 ${bam} |
+  samtools index -@ ${task.cpus-1} ${bam}
+  samtools mpileup -@ ${task.cpus-1} -A -d ${params.mpileupDepth} -Q0 ${bam} |
       ivar consensus -q ${params.ivarQualThreshold} -t ${params.ivarFreqThreshold} -m ${params.minDepth} -n N -p ${sampleName}.primertrimmed.consensus
   echo '>${sampleName}' > ${sampleName}.consensus.fa
   seqtk seq -l 50 ${sampleName}.primertrimmed.consensus.fa | tail -n +2 >> ${sampleName}.consensus.fa
@@ -384,13 +384,13 @@ process callVariants {
 
     script:
     """
-    bcftools mpileup -a FORMAT/AD -f ${ref_fasta} ${in_bams} |
-        bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - |
-        bcftools view -i 'DP>=${params.minDepth}' \
-        > ${sampleName}.vcf
-    bgzip ${sampleName}.vcf
+    bcftools mpileup --threads ${task.cpus-1} -a FORMAT/AD -f ${ref_fasta} ${in_bams} |
+	bcftools call --threads ${task.cpus-1} --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - |
+	bcftools view --threads ${task.cpus-1} -i 'DP>=${params.minDepth}' \
+	> ${sampleName}.vcf
+    bgzip -@ ${task.cpus-1} ${sampleName}.vcf
     tabix ${sampleName}.vcf.gz
-    bcftools stats ${sampleName}.vcf.gz > ${sampleName}.bcftools_stats
+    bcftools stats --threads ${task.cpus-1} ${sampleName}.vcf.gz > ${sampleName}.bcftools_stats
     """
 }
 
@@ -422,8 +422,8 @@ process computeStats {
 
     script:
     """
-    samtools index ${trimmed_filtered_bam}
-    samtools stats ${trimmed_filtered_bam} > ${sampleName}.samtools_stats
+    samtools index -@ ${task.cpus-1} ${trimmed_filtered_bam}
+    samtools stats -@ ${task.cpus-1} ${trimmed_filtered_bam} > ${sampleName}.samtools_stats
     alignment_assembly_stats.py \
 	--sample_name ${sampleName} \
 	--cleaned_bam ${trimmed_filtered_bam} \
@@ -463,11 +463,11 @@ process combinedVariants {
     bcftools merge \$(printf "%s\n" ${vcfs}) | bcftools query -f '%CHROM\\t%POS\\t%END\\n' > variant_positions.txt
     split -e -n l/${task.cpus} variant_positions.txt split_regions_
     ls split_regions_* |
-        parallel -I % -j ${Math.ceil(task.cpus/2) as int} \
-        'bcftools mpileup -a FORMAT/DP,FORMAT/AD -f ${ref_fasta} \
-        -R % ${in_bams} |
-        bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
-        > %.vcf'
+	parallel -I % -j ${Math.ceil(task.cpus/2) as int} \
+	'bcftools mpileup -a FORMAT/DP,FORMAT/AD -f ${ref_fasta} \
+	-R % ${in_bams} |
+	bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
+	> %.vcf'
     bcftools concat split_regions_*.vcf > combined.vcf
     """
 }
