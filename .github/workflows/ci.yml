@@ -32,7 +32,7 @@ jobs:
       - name: Pull docker image
         run: |
           docker pull czbiohub/sc2-msspe:dev && docker tag czbiohub/sc2-msspe:dev czbiohub/sc2-msspe:dev
-      - name: Run pipeline with test data (single-end fastq input)
+      - name: Run pipeline with ${{ matrix.profile_flags }}
         run: |
           # TODO nf-core: You can customise CI pipeline run tests as required
           # (eg. adding multiple test runs with different parameters)
