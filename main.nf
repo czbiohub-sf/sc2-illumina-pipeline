@@ -24,7 +24,7 @@ def helpMessage() {
       --minLength                   Minimum base pair length to allow assemblies to pass QC
       --no_reads_quast              Run QUAST without aligning reads
       --ercc_fasta                  Default: data/ercc_sequences.fasta
-      --save_sars2_filtered_reads   Whether to save the host-filtered reads
+      --save_sars2_filtered_reads   Whether to save the reads filtered down to just SARS-CoV-2
 
     Other options:
       --outdir                      The output directory where the results will be saved
