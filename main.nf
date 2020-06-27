@@ -24,7 +24,7 @@ def helpMessage() {
       --minLength                   Minimum base pair length to allow assemblies to pass QC
       --no_reads_quast              Run QUAST without aligning reads
       --ercc_fasta                  Default: data/ercc_sequences.fasta
-      --save_filtered_reads         Whether to save the host-filtered reads
+      --save_sars2_filtered_reads   Whether to save the host-filtered reads
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -172,9 +172,9 @@ process filterReads {
     tag { sampleName }
     label 'process_large'
     // Don't create filtered-sars2-reads subfolder if flag not specified
-    publishDir path: { params.save_filtered_reads ? "${params.outdir}/filtered-sars2-reads" : params.outdir },
+    publishDir path: { params.save_sars2_filtered_reads ? "${params.outdir}/filtered-sars2-reads" : params.outdir },
       mode: 'copy',
-      saveAs: { params.save_filtered_reads ? it : null }
+      saveAs: { params.save_sars2_filtered_reads ? it : null }
 
     input:
     path(db) from kraken2_db.collect()
