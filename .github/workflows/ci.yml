@@ -14,6 +14,14 @@ jobs:
       matrix:
         # Nextflow versions: check pipeline minimum and current latest
         nxf_ver: ['19.10.0', '']
+        profile_flags: [
+        'test',
+        'test --skip_trim_adapters',
+        'test --skip_filter_ref',
+        'test --save_sars2_filtered_reads',
+        'test_fasta_reads',
+        'test_single_end',
+        ]
     steps:
       - uses: actions/checkout@v2
       - name: Install Nextflow
@@ -24,8 +32,8 @@ jobs:
       - name: Pull docker image
         run: |
           docker pull czbiohub/sc2-msspe:dev && docker tag czbiohub/sc2-msspe:dev czbiohub/sc2-msspe:dev
-      - name: Run pipeline with test data (single-end fastq input)
+      - name: Run pipeline with ${{ matrix.profile_flags }}
         run: |
           # TODO nf-core: You can customise CI pipeline run tests as required
           # (eg. adding multiple test runs with different parameters)
-          ${NXF_RUN} ${GITHUB_WORKSPACE} -profile test,docker
+          ${NXF_RUN} ${GITHUB_WORKSPACE} -profile docker,${{ matrix.profile_flags }}
