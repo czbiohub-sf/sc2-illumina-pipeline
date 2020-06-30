@@ -50,6 +50,9 @@ if args.cleaned_bam:
     depths = np.array(depths)
 
     stats["depth_avg"] = depths.mean()
+    stats["depth_q.01"] = np.quantile(depths, .01)
+    stats["depth_q.05"] = np.quantile(depths, .05)
+    stats["depth_q.1"] = np.quantile(depths, .1)
     stats["depth_q.25"] = np.quantile(depths, .25)
     stats["depth_q.5"] = np.quantile(depths, .5)
     stats["depth_q.75"] = np.quantile(depths, .75)
