@@ -45,7 +45,7 @@ if args.cleaned_bam:
     samfile = pysam.AlignmentFile(args.cleaned_bam, "rb")
     ref_len, = samfile.lengths
     depths = [0] * ref_len
-    for column in samfile.pileup():
+    for column in samfile.pileup(max_depth=0):
         depths[column.reference_pos] = column.nsegments
     depths = np.array(depths)
 

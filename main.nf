@@ -334,7 +334,7 @@ process makeConsensus {
   script:
   """
   samtools index ${bam}
-  samtools mpileup -A -d ${params.mpileupDepth} -Q0 ${bam} |
+  samtools mpileup -A -d 0 -Q0 ${bam} |
       ivar consensus -q ${params.ivarQualThreshold} -t ${params.ivarFreqThreshold} -m ${params.minDepth} -n N -p ${sampleName}.primertrimmed.consensus
   echo '>${sampleName}' > ${sampleName}.consensus.fa
   seqtk seq -l 50 ${sampleName}.primertrimmed.consensus.fa | tail -n +2 >> ${sampleName}.consensus.fa
@@ -389,7 +389,7 @@ process callVariants {
 
     script:
     """
-    bcftools mpileup -a FORMAT/AD -f ${ref_fasta} ${in_bams} |
+    bcftools mpileup -d 0 -a FORMAT/AD -f ${ref_fasta} ${in_bams} |
         bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - |
         bcftools view -i 'DP>=${params.minDepth}' \
         > ${sampleName}.vcf
@@ -469,7 +469,7 @@ process combinedVariants {
     split -e -n l/${task.cpus} variant_positions.txt split_regions_
     ls split_regions_* |
         parallel -I % -j ${Math.ceil(task.cpus/2) as int} \
-        'bcftools mpileup -a FORMAT/DP,FORMAT/AD -f ${ref_fasta} \
+        'bcftools mpileup -d 0 -a FORMAT/DP,FORMAT/AD -f ${ref_fasta} \
         -R % ${in_bams} |
         bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
         > %.vcf'
