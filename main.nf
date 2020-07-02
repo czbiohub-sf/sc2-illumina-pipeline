@@ -387,9 +387,10 @@ process callVariants {
     path("${sampleName}.bcftools_stats") into bcftools_stats_ch
     path("${sampleName}.vcf.gz.tbi")
 
+    // NOTE: we use samtools instead of bcftools mpileup because bcftools 1.9 ignores -d0
     script:
     """
-    bcftools mpileup -d 0 -a FORMAT/AD -f ${ref_fasta} ${in_bams} |
+    samtools mpileup -u -d 0 -t AD -f ${ref_fasta} ${in_bams} |
         bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - |
         bcftools view -i 'DP>=${params.minDepth}' \
         > ${sampleName}.vcf
@@ -461,16 +462,17 @@ process combinedVariants {
     output:
     path("combined.vcf") into combined_variants_vcf
 
+    // NOTE: we use samtools instead of bcftools mpileup because bcftools 1.9 ignores -d0
     script:
     """
     printf "%s\\n" ${vcfs} | xargs -I % tabix %
     printf "%s\\n" ${in_bams} | xargs -I % samtools index %
-    bcftools merge \$(printf "%s\n" ${vcfs}) | bcftools query -f '%CHROM\\t%POS\\t%END\\n' > variant_positions.txt
+    bcftools merge \$(printf "%s\n" ${vcfs}) | bcftools query -f '%CHROM\\t%POS\\n' > variant_positions.txt
     split -e -n l/${task.cpus} variant_positions.txt split_regions_
     ls split_regions_* |
         parallel -I % -j ${Math.ceil(task.cpus/2) as int} \
-        'bcftools mpileup -d 0 -a FORMAT/DP,FORMAT/AD -f ${ref_fasta} \
-        -R % ${in_bams} |
+        'samtools mpileup -u -d 0 -t DP,AD -f ${ref_fasta} \
+        -l % ${in_bams} |
         bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
         > %.vcf'
     bcftools concat split_regions_*.vcf > combined.vcf
