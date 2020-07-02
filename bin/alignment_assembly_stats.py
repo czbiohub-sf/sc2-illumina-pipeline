@@ -43,11 +43,15 @@ elif args.neighborfasta:
 
 
 if args.cleaned_bam:
+    # use samtools instead of pysam, because pysam appears to ignore -d0
     depths = subprocess.run(
         "samtools depth -aa -d 0 {} | awk {}".format(
             shlex.quote(args.cleaned_bam), "'{print $3}'"),
-        shell=True, stdout=subprocess.PIPE).stdout
-    depths = np.array([int(d.strip()) for d in depths.decode().strip().split("\n")])
+        shell=True, stdout=subprocess.PIPE).stdout.decode().strip()
+    if depths:
+        depths = np.array([int(d.strip()) for d in depths.split("\n")])
+    else:
+        depths = np.array([0] * pysam.AlignmentFile(args.cleaned_bam, "rb").lengths[0])
 
     stats["depth_avg"] = depths.mean()
     stats["depth_q.01"] = np.quantile(depths, .01)
