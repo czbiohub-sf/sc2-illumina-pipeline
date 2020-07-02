@@ -334,7 +334,7 @@ process makeConsensus {
   script:
   """
   samtools index ${bam}
-  samtools mpileup -A -d ${params.mpileupDepth} -Q0 ${bam} |
+  samtools mpileup -A -d 0 -Q0 ${bam} |
       ivar consensus -q ${params.ivarQualThreshold} -t ${params.ivarFreqThreshold} -m ${params.minDepth} -n N -p ${sampleName}.primertrimmed.consensus
   echo '>${sampleName}' > ${sampleName}.consensus.fa
   seqtk seq -l 50 ${sampleName}.primertrimmed.consensus.fa | tail -n +2 >> ${sampleName}.consensus.fa
@@ -387,9 +387,10 @@ process callVariants {
     path("${sampleName}.bcftools_stats") into bcftools_stats_ch
     path("${sampleName}.vcf.gz.tbi")
 
+    // NOTE: we use samtools instead of bcftools mpileup because bcftools 1.9 ignores -d0
     script:
     """
-    bcftools mpileup -a FORMAT/AD -f ${ref_fasta} ${in_bams} |
+    samtools mpileup -u -d 0 -t AD -f ${ref_fasta} ${in_bams} |
         bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - |
         bcftools view -i 'DP>=${params.minDepth}' \
         > ${sampleName}.vcf
@@ -461,16 +462,17 @@ process combinedVariants {
     output:
     path("combined.vcf") into combined_variants_vcf
 
+    // NOTE: we use samtools instead of bcftools mpileup because bcftools 1.9 ignores -d0
     script:
     """
     printf "%s\\n" ${vcfs} | xargs -I % tabix %
     printf "%s\\n" ${in_bams} | xargs -I % samtools index %
-    bcftools merge \$(printf "%s\n" ${vcfs}) | bcftools query -f '%CHROM\\t%POS\\t%END\\n' > variant_positions.txt
+    bcftools merge \$(printf "%s\n" ${vcfs}) | bcftools query -f '%CHROM\\t%POS\\n' > variant_positions.txt
     split -e -n l/${task.cpus} variant_positions.txt split_regions_
     ls split_regions_* |
         parallel -I % -j ${Math.ceil(task.cpus/2) as int} \
-        'bcftools mpileup -a FORMAT/DP,FORMAT/AD -f ${ref_fasta} \
-        -R % ${in_bams} |
+        'samtools mpileup -u -d 0 -t DP,AD -f ${ref_fasta} \
+        -l % ${in_bams} |
         bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
         > %.vcf'
     bcftools concat split_regions_*.vcf > combined.vcf

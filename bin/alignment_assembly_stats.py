@@ -5,6 +5,7 @@ import collections
 import json
 import re
 import subprocess
+import shlex
 import pysam
 from Bio import SeqIO
 import numpy as np
@@ -42,12 +43,15 @@ elif args.neighborfasta:
 
 
 if args.cleaned_bam:
-    samfile = pysam.AlignmentFile(args.cleaned_bam, "rb")
-    ref_len, = samfile.lengths
-    depths = [0] * ref_len
-    for column in samfile.pileup():
-        depths[column.reference_pos] = column.nsegments
-    depths = np.array(depths)
+    # use samtools instead of pysam, because pysam appears to ignore -d0
+    depths = subprocess.run(
+        "samtools depth -aa -d 0 {} | awk {}".format(
+            shlex.quote(args.cleaned_bam), "'{print $3}'"),
+        shell=True, stdout=subprocess.PIPE).stdout.decode().strip()
+    if depths:
+        depths = np.array([int(d.strip()) for d in depths.split("\n")])
+    else:
+        depths = np.array([0] * pysam.AlignmentFile(args.cleaned_bam, "rb").lengths[0])
 
     stats["depth_avg"] = depths.mean()
     stats["depth_q.01"] = np.quantile(depths, .01)
@@ -61,7 +65,7 @@ if args.cleaned_bam:
     stats["depth_frac_above_50x"] = (depths >= 30).mean()
     stats["depth_frac_above_100x"] = (depths >= 100).mean()
 
-    ax = sns.lineplot(np.arange(1, ref_len+1), depths)
+    ax = sns.lineplot(np.arange(1, len(depths)+1), depths)
     ax.set_title(args.sample_name)
     ax.set(xlabel="position", ylabel="depth")
     plt.yscale("symlog")
@@ -71,7 +75,8 @@ seq, = SeqIO.parse(args.assembly, "fasta")
 stats["allele_counts"] = dict(collections.Counter(str(seq.seq)))
 
 if args.reads:
-    fq_lines = subprocess.run(" ".join(["zcat"] + list(args.reads)) + " | wc -l",
+    fq_lines = subprocess.run(" ".join(["zcat"] + [shlex.quote(r) for r in args.reads])
+                              + " | wc -l",
                               shell=True, stdout=subprocess.PIPE).stdout
     stats["total_reads"] = int(int(fq_lines) / 4)
 
