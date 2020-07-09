@@ -6,12 +6,23 @@ files. We are using it on the following types of sequencing data:
    ([protocols.io](https://www.protocols.io/private/32717E8D59E211EABDB40242AC110003?step=4)).
 2. Amplicon-based short-read sequencing (using ARTIC v3 protocol).
 
+<!-- MarkdownTOC -->
+
+- [Typical usage](#typical-usage)
+	- [Outputs](#outputs)
+- [Testing](#testing)
+- [Benchmarking](#benchmarking)
+- [Documentation](#documentation)
+- [Acknowledgments](#acknowledgments)
+
+<!-- /MarkdownTOC -->
+
 # Typical usage
 
 For generating consensus genomes from reads:
 
 ```{sh}
-nextflow run main.nf -profile docker \
+nextflow run czbiohub/sc2-msspe-bioinfo -profile docker \
     --reads '[s3://]path/to/reads/*_R{1,2}_001.fastq.gz*' \
     --kraken2_db '[s3://]path/to/kraken2db' \
     --outdir '[s3://]path/to/outdir'
@@ -74,13 +85,14 @@ Simple benchmark (for mapping, not speed). Run after algorithm changes to see ho
 nextflow run main.nf --profile docker,benchmark
 ```
 
-# Analysis pipeline
+# Documentation
 
-Analysis pipeline has moved here: https://github.com/czbiohub/sc2-ngs-analysis
+The czbiohub/sc2-msspe-bioinfo pipeline comes with documentation about the pipeline, found in the `docs/` directory:
 
-# Pipeline Overview
+1. [Installation](docs/installation.md)
+2. [Running the pipeline](docs/running.md)
 
-TODO
+
 
 # Acknowledgments
 
