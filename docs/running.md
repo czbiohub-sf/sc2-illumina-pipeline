@@ -21,6 +21,12 @@
 	- [`--ercc_fasta`](#--ercc_fasta)
 	- [`--save_sars2_filtered_reads`](#--save_sars2_filtered_reads)
 	- [`--outdir`](#--outdir)
+- [Primer trimming](#primer-trimming)
+	- [`--samQualThreshold`](#--samqualthreshold)
+- [Consensus calling](#consensus-calling)
+	- [`--ivarQualThreshold`](#--ivarqualthreshold)
+	- [`--ivarFreqThreshold`](#--ivarfreqthreshold)
+	- [`--minDepth`](#--mindepth)
 - [AWS Batch specific parameters](#aws-batch-specific-parameters)
 	- [`--awsqueue`](#--awsqueue)
 	- [`--awsregion`](#--awsregion)
@@ -209,6 +215,27 @@ or
 ```bash
 --outdir s3://bucket/results/
 ```
+## Primer trimming
+
+### `--samQualThreshold`
+
+Minimum quality score for a read to be included in the alignment. This is `20` by default.
+
+## Consensus calling
+
+The defaults for these parameters normally do not need to be adjusted.
+
+### `--ivarQualThreshold`
+
+Minimum alignment quality for a read to contribute to an allele call using `ivar consensus`. This is set to `20` by default.
+
+### `--ivarFreqThreshold`
+
+Minimum allele frequency to call a consensus at a position using `ivar consensus`. This is set to `0.9` by default, so the dominant allele must have 90% frequency to be called. Otherwise, an ambiguous base (IUPAC codes) will be called at that position.
+
+### `--minDepth`
+
+Minimum depth at a position for an allele to be called. This is set to `10` by default, so if less than 10 reads align to a position, `N` will be called at that position.
 
 ## AWS Batch specific parameters
 Running the pipeline on AWS Batch requires a couple of specific parameters to be set according to your AWS Batch configuration. Please use the `-awsbatch` profile and then specify all of the following parameters.
