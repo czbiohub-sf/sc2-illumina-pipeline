@@ -91,6 +91,7 @@ The czbiohub/sc2-msspe-bioinfo pipeline comes with documentation about the pipel
 
 1. [Installation](docs/installation.md)
 2. [Running the pipeline](docs/running.md)
+3. [Pipeline overview](docs/overview.md)
 
 
 

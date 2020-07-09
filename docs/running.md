@@ -24,6 +24,14 @@
 - [AWS Batch specific parameters](#aws-batch-specific-parameters)
 	- [`--awsqueue`](#--awsqueue)
 	- [`--awsregion`](#--awsregion)
+- [Other command line parameters](#other-command-line-parameters)
+	- [`-name`](#-name)
+	- [`-resume`](#-resume)
+	- [`-c`](#-c)
+	- [`--max_memory`](#--max_memory)
+	- [`--max_time`](#--max_time)
+	- [`--max_cpus`](#--max_cpus)
+	- [`--multiqc_config`](#--multiqc_config)
 
 <!-- /MarkdownTOC -->
 
@@ -211,7 +219,41 @@ The AWS region to run your job in. Default is set to `us-west-2` but can be adju
 
 Please make sure to also set the `-w/--work-dir` and `--outdir` parameters to a S3 storage bucket of your choice - you'll get an error message notifying you if you didn't.
 
+## Other command line parameters
 
+### `-name`
+Name for the pipeline run. If not specified, Nextflow will automatically generate a random mnemonic.
+
+**NB:** Single hyphen (core Nextflow option)
+
+### `-resume`
+Specify this when restarting a pipeline. Nextflow will used cached results from any pipeline steps where the inputs are the same, continuing from where it got to previously.
+
+You can also supply a run name to resume a specific run: `-resume [run-name]`. Use the `nextflow log` command to show previous run names.
+
+**NB:** Single hyphen (core Nextflow option)
+
+### `-c`
+Specify the path to a specific config file (this is a core NextFlow command).
+
+**NB:** Single hyphen (core Nextflow option)
+
+Note - you can use this to override pipeline defaults.
+
+### `--max_memory`
+Use to set a top-limit for the default memory requirement for each process.
+Should be a string in the format integer-unit. eg. `--max_memory '8.GB'`
+
+### `--max_time`
+Use to set a top-limit for the default time requirement for each process.
+Should be a string in the format integer-unit. eg. `--max_time '2.h'`
+
+### `--max_cpus`
+Use to set a top-limit for the default CPU requirement for each process.
+Should be a string in the format integer-unit. eg. `--max_cpus 1`
+
+### `--multiqc_config`
+Specify a path to a custom MultiQC configuration file.
 
 
 -----------
