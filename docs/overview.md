@@ -10,6 +10,13 @@
 	- [`trimPrimers`](#trimprimers)
 	- [`makeConsensus`](#makeconsensus)
 	- [`quast`](#quast)
+	- [`callVariants`](#callvariants)
+	- [`computeStats`](#computestats)
+	- [`combinedVariants`](#combinedvariants)
+	- [`mergeAllAssemblies`](#mergeallassemblies)
+	- [`mergeAssemblyStats`](#mergeassemblystats)
+	- [`filterAssemblies`](#filterassemblies)
+	- [`multiqc`](#multiqc)
 
 <!-- /MarkdownTOC -->
 ## Processes
@@ -28,7 +35,7 @@ Filter for only SARS-CoV-2 reads. This is accomplished by first mapping with `mi
 
 ### `trimReads`
 
-Trim adapter sequences and perform quality-trimming using [Trim Galore](https://github.com/FelixKrueger/TrimGalore). Skip this step with the flag `--skip_trim_adapters`. The trimmed reads will be published to the folder `trimmed-reads`.
+Trim adapter sequences and perform quality-trimming using [Trim Galore](https://github.com/FelixKrueger/TrimGalore). Skip this step with the flag `--skip_trim_adapters`. The trimmed reads will be published to the folder `trimmed-reads`. These will be sent to [`alignReads`](#alignreads) and [`callVariants`](#callvariants).
 
 ### `alignReads`
 
@@ -44,4 +51,32 @@ Call a consensus genome using `ivar consensus`. See [here](running.md#primer-tri
 
 ### `quast`
 
-Run `QUAST` on the consensus genomes.
+Run `QUAST` on the consensus genomes. The results will be published to the folder `QUAST`.
+
+### `callVariants`
+
+Call variant sites (SNPs) use `samtools mpileup` and `bcftools call`. This will also produce files from `bcftools stats`. The VCF files and stats files are published to `sample-variants`.
+
+### `computeStats`
+
+Compute alignment and assembly statistics using `samtools stats` and the python script [`alignment_assembly_stats.py`](../bin/alignment_assembly_stats.py). Coverage plots are created during this process and published to `coverage-plots`.
+
+### `combinedVariants`
+
+Creates a joint VCF using `samtools` and `bcftools`. `combined.vcf` will be published to the output directory. This is skipped by default.
+
+### `mergeAllAssemblies`
+
+Combine all the consensus genomes into one file `combined.fa`, which will be published to the output directory.
+
+### `mergeAssemblyStats`
+
+Parse previous files to create a summary statistics file `combined.stats.tsv`. This will be published to `call_consensus-stats/combined.stats.tsv`.
+
+### `filterAssemblies`
+
+Filter the assemblies based on the criteria given with `--maxNs` and `--minLength`. This outputs `filtered.fa`, published to the output directory, and `filtered.stats.tsv`, published to `call_consensus-stats`.
+
+### `multiqc`
+
+Run MultiQC to collect the reports from `Trim Galore` (`FastQC`), `QUAST`, `samtools` and `bcftools`. The output will be published to the folder `MultiQC`.

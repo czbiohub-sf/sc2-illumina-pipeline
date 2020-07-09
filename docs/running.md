@@ -30,6 +30,9 @@
 - [AWS Batch specific parameters](#aws-batch-specific-parameters)
 	- [`--awsqueue`](#--awsqueue)
 	- [`--awsregion`](#--awsregion)
+- [Variant calling](#variant-calling)
+	- [`--bcftoolsCallTheta`](#--bcftoolscalltheta)
+	- [`--joint_variant_calling`](#--joint_variant_calling)
 - [Other command line parameters](#other-command-line-parameters)
 	- [`-name`](#-name)
 	- [`-resume`](#-resume)
@@ -245,6 +248,16 @@ The JobQueue that you intend to use on AWS Batch. If you are running with CZB cr
 The AWS region to run your job in. Default is set to `us-west-2` but can be adjusted to your needs.
 
 Please make sure to also set the `-w/--work-dir` and `--outdir` parameters to a S3 storage bucket of your choice - you'll get an error message notifying you if you didn't.
+
+## Variant calling
+
+### `--bcftoolsCallTheta`
+
+Mutation rate for `bcftools call`. This is .0006 by default.
+
+### `--joint_variant_calling`
+
+Create a joint VCF. This is off by default since it takes a long time.
 
 ## Other command line parameters
 
