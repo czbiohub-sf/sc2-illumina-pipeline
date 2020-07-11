@@ -6,6 +6,7 @@ files. We are using it on the following types of sequencing data:
    ([protocols.io](https://www.protocols.io/private/32717E8D59E211EABDB40242AC110003?step=4)).
 2. Amplicon-based short-read sequencing (using ARTIC v3 protocol).
 
+------
 <!-- MarkdownTOC -->
 
 - [Typical usage](#typical-usage)
