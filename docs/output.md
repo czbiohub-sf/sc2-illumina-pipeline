@@ -5,10 +5,18 @@
 - [`combined.fa`](#combinedfa)
 - [`filtered.fa`](#filteredfa)
 - [`MultiQC/`](#multiqc)
+	- [`multiqc_report.html`](#multiqc_reporthtml)
 - [`QUAST/`](#quast)
 - [`aligned-reads/`](#aligned-reads)
 - [`call_consensus-stats/`](#call_consensus-stats)
 	- [`combined.stats.tsv`](#combinedstatstsv)
+	- [`filtered.stats.tsv`](#filteredstatstsv)
+- [`consensus-seqs/`](#consensus-seqs)
+- [`coverage-plots/`](#coverage-plots)
+- [`ercc-stats/`](#ercc-stats)
+- [`filtered-sars2-reads/`](#filtered-sars2-reads)
+- [`sample-variants/`](#sample-variants)
+- [`trimmed-reads/`](#trimmed-reads)
 
 <!-- /MarkdownTOC -->
 ## Summary
@@ -50,6 +58,10 @@ outdir
 ├── ercc-stats
 │   ├── sample1.ercc_stats
 │   └── ...
+├── filtered-sars2-reads			# optional
+│   ├── sample1_covid_1_val_1.fq.gz
+│   ├── sample1_covid_2_val_2.fq.gz
+│   └── ...
 ├── sample-variants
 │   ├── sample1.bcftools_stats
 │   ├── sample1.vcf.gz
@@ -72,6 +84,10 @@ A multi-FASTA file containing only sequences that pass filtering by `--maxNs` an
 ## `MultiQC/`
 
 All MultiQC output files.
+
+### `multiqc_report.html`
+
+QC report from MultiQC (aggregates stats from quast, samtools, trim-galore, bcftools).
 
 ## `QUAST/`
 
@@ -141,3 +157,31 @@ Summary statistics for each sample run through the pipeline. Each column is desc
 	- This is the number of paired or single reads that map to the file given by `--ercc_fasta`.
 - `ercc_mapped_paired`
 	- This is the number of paired reads that are mapped to the file given by `--ercc_fasta`.
+
+### `filtered.stats.tsv`
+
+This file contains the same columns as in `combined.stats.tsv`, but is filtered only for samples that pass the filters imposed by `--maxNs` and `--minLength`.
+
+## `consensus-seqs/`
+
+All individual sample consensus sequences are in this folder.
+
+## `coverage-plots/`
+
+Line plots of coverage for each sample.
+
+## `ercc-stats/`
+
+The outputs of `samtools stats` on the alignments to the file `--ercc_fasta`.
+
+## `filtered-sars2-reads/`
+
+This folder is only created when the flag `--save_sars2_filtered_reads` is set. It contains untrimmed reads that are host-filtered and map to the reference genome.
+
+## `sample-variants/`
+
+VCFs for each sample with respect to the reference.
+
+## `trimmed-reads/`
+
+Sample reads that have undergone all filtering steps and adapter-trimming.

@@ -9,7 +9,6 @@ files. We are using it on the following types of sequencing data:
 <!-- MarkdownTOC -->
 
 - [Typical usage](#typical-usage)
-	- [Outputs](#outputs)
 - [Testing](#testing)
 - [Benchmarking](#benchmarking)
 - [Documentation](#documentation)
@@ -30,51 +29,12 @@ nextflow run czbiohub/sc2-msspe-bioinfo -profile docker \
 
 The kraken2db can be downloaded from https://genexa.ch/sars2-bioinformatics-resources/.
 
-## Outputs
-
-Below is a non-exhaustive list of the outputs from the `main.nf` pipeline.
-
-```
-├── combined.fa
-├── filtered.fa
-├── combined.vcf
-├── call_consensus-stats
-│   ├── combined.stats.tsv
-│   └── filtered.stats.tsv
-├── MultiQC
-│   └── multiqc_report.html
-├── aligned-reads
-│   ├── sample1.primertrimmed.bam
-│   ├── sample1.primertrimmed.bam.bai
-│   ├── sample2.primertrimmed.bam
-│   └── ...
-├── coverage-plots
-│   ├── sample1.depths.png
-│   ├── sample2.depths.bam
-│   └── ...
-├── trimmed-reads
-│   ├── sample1_1_val_1.fq.gz
-│   ├── sample1_2_val_2.fq.gz
-│   ├── sample2_1_val_1.fq.gz
-│   ├── sample2_2_val_2.fq.gz
-│   └── ...
-```
-
-- `combined.fa`: Fasta of consensus sequences for all samples.
-- `filtered.fa`: Fasta of consensus sequences for samples passing
-  filters (default: require 25000 nonmissing genome).
-- `combined.vcf`: VCF of variants for all samples.
-- `call_consensus-stats`: Folder containing basic QC stats for consensus genomes.
-- `MultiQC/multiqc_report.html`: QC report from MultiQC (aggregates stats from quast,
-  samtools, trim-galore, bcftools).
-- `aligned-reads`: Bamfile of trimmed reads mapping to reference.
-
 # Testing
 
 Simple test to make sure things aren't broken:
 
 ```{sh}
-nextflow run main.nf -profile docker,test
+nextflow run czbiohub/sc2-msspe-bioinfo -profile docker,test
 ```
 
 # Benchmarking
@@ -82,7 +42,7 @@ nextflow run main.nf -profile docker,test
 Simple benchmark (for mapping, not speed). Run after algorithm changes to see how accuracy might be affected. Result in `benchmark/call_consensus-stats/combined.stats.tsv`
 
 ```{sh}
-nextflow run main.nf --profile docker,benchmark
+nextflow run czbiohub/sc2-msspe-bioinfo --profile docker,benchmark
 ```
 
 # Documentation
@@ -92,7 +52,7 @@ The czbiohub/sc2-msspe-bioinfo pipeline comes with documentation about the pipel
 1. [Installation](docs/installation.md)
 2. [Running the pipeline](docs/running.md)
 3. [Pipeline overview](docs/overview.md)
-
+4. [Output](docs/output.md)
 
 
 # Acknowledgments
