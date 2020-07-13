@@ -1,4 +1,4 @@
-# czbiohub/sc2-msspe-bioinfo feature request
+# czbiohub/sc2-illumina-pipeline feature request
 
 Hi there!
 

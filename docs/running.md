@@ -59,7 +59,7 @@ NXF_OPTS='-Xms1g -Xmx4g'
 For generating consensus genomes from reads:
 
 ```{sh}
-nextflow run czbiohub/sc2-msspe-bioinfo -profile docker \
+nextflow run czbiohub/sc2-illumina-pipeline -profile docker \
     --reads '[s3://]path/to/reads/*_R{1,2}_001.fastq.gz*' \
     --kraken2_db '[s3://]path/to/kraken2db' \
     --outdir '[s3://]path/to/outdir'
@@ -72,7 +72,7 @@ The kraken2db can be downloaded from https://genexa.ch/sars2-bioinformatics-reso
 The above command will automatically pull the code from GitHub and store it as a cached version. This cached version (found in `.nextflow/assets/`) will be used for subsequent runs in available. To make sure you are running the latest version of the pipeline, update the cached version:
 
 ```bash
-nextflow pull czbiohub/sc2-msspe-bioinfo
+nextflow pull czbiohub/sc2-illumina-pipeline
 ```
 
 ## Main arguments

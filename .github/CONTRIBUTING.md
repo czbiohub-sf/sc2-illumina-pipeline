@@ -1,23 +1,23 @@
-# czbiohub/sc2-msspe-bioinfo: Contributing Guidelines
+# czbiohub/sc2-illumina-pipeline: Contributing Guidelines
 
 Hi there!
-Many thanks for taking an interest in improving czbiohub/sc2-msspe-bioinfo.
+Many thanks for taking an interest in improving czbiohub/sc2-illumina-pipeline.
 
-We try to manage the required tasks for czbiohub/sc2-msspe-bioinfo using GitHub issues, you probably came to this page when creating one.
+We try to manage the required tasks for czbiohub/sc2-illumina-pipeline using GitHub issues, you probably came to this page when creating one.
 Please use the pre-filled template to save time.
 
 However, don't be put off by this template - other more general issues and suggestions are welcome!
 Contributions to the code are even more welcome ;)
 
-> If you need help using or modifying czbiohub/sc2-msspe-bioinfo then the best place to ask is on the nf-core Slack [#predictorthologs](https://nfcore.slack.com/channels/predictorthologs) channel ([join our Slack here](https://nf-co.re/join/slack)).
+> If you need help using or modifying czbiohub/sc2-illumina-pipeline then the best place to ask is on the nf-core Slack [#predictorthologs](https://nfcore.slack.com/channels/predictorthologs) channel ([join our Slack here](https://nf-co.re/join/slack)).
 
 ## Contribution workflow
 
-If you'd like to write some code for czbiohub/sc2-msspe-bioinfo, the standard workflow is as follows:
+If you'd like to write some code for czbiohub/sc2-illumina-pipeline, the standard workflow is as follows:
 
-1. Check that there isn't already an issue about your idea in the [czbiohub/sc2-msspe-bioinfo issues](https://github.com/czbiohub/sc2-msspe-bioinfo/issues) to avoid duplicating work
+1. Check that there isn't already an issue about your idea in the [czbiohub/sc2-illumina-pipeline issues](https://github.com/czbiohub/sc2-illumina-pipeline/issues) to avoid duplicating work
     * If there isn't one already, please create one so that others know you're working on this
-2. [Fork](https://help.github.com/en/github/getting-started-with-github/fork-a-repo) the [czbiohub/sc2-msspe-bioinfo repository](https://github.com/czbiohub/sc2-msspe-bioinfo) to your GitHub account
+2. [Fork](https://help.github.com/en/github/getting-started-with-github/fork-a-repo) the [czbiohub/sc2-illumina-pipeline repository](https://github.com/czbiohub/sc2-illumina-pipeline) to your GitHub account
 3. Make the necessary changes / additions within your forked repository
 4. Submit a Pull Request against the `dev` branch and wait for the code to be reviewed and merged
 
@@ -60,4 +60,4 @@ make test
 
 ## Getting help
 
-For further information/help, please consult the [czbiohub/sc2-msspe-bioinfo documentation](https://nf-co.re/czbiohub/sc2-msspe-bioinfo/docs) and don't hesitate to get in touch on the nf-core Slack [#predictorthologs](https://nfcore.slack.com/channels/predictorthologs) channel ([join our Slack here](https://nf-co.re/join/slack)).
+For further information/help, please consult the [czbiohub/sc2-illumina-pipeline documentation](https://nf-co.re/czbiohub/sc2-illumina-pipeline/docs) and don't hesitate to get in touch on the nf-core Slack [#predictorthologs](https://nfcore.slack.com/channels/predictorthologs) channel ([join our Slack here](https://nf-co.re/join/slack)).

@@ -22,7 +22,7 @@ files. We are using it on the following types of sequencing data:
 For generating consensus genomes from reads:
 
 ```{sh}
-nextflow run czbiohub/sc2-msspe-bioinfo -profile docker \
+nextflow run czbiohub/sc2-illumina-pipeline -profile docker \
     --reads '[s3://]path/to/reads/*_R{1,2}_001.fastq.gz*' \
     --kraken2_db '[s3://]path/to/kraken2db' \
     --primers 'path/to/primers.bed' \
@@ -36,7 +36,7 @@ The kraken2db can be downloaded from https://genexa.ch/sars2-bioinformatics-reso
 Simple test to make sure things aren't broken:
 
 ```{sh}
-nextflow run czbiohub/sc2-msspe-bioinfo -profile docker,test
+nextflow run czbiohub/sc2-illumina-pipeline -profile docker,test
 ```
 
 # Benchmarking
@@ -44,12 +44,12 @@ nextflow run czbiohub/sc2-msspe-bioinfo -profile docker,test
 Simple benchmark (for mapping, not speed). Run after algorithm changes to see how accuracy might be affected. Result in `benchmark/call_consensus-stats/combined.stats.tsv`
 
 ```{sh}
-nextflow run czbiohub/sc2-msspe-bioinfo --profile docker,benchmark
+nextflow run czbiohub/sc2-illumina-pipeline --profile docker,benchmark
 ```
 
 # Documentation
 
-The czbiohub/sc2-msspe-bioinfo pipeline comes with documentation about the pipeline, found in the `docs/` directory:
+The czbiohub/sc2-illumina-pipeline pipeline comes with documentation about the pipeline, found in the `docs/` directory:
 
 1. [Installation](docs/installation.md)
 2. [Running the pipeline](docs/running.md)

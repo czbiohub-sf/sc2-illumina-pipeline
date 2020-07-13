@@ -9,7 +9,7 @@
 
 ## Nextflow
 
-The `czbiohub/sc2-msspe-bioinfo` pipeline uses Nextflow, which must be present on the system where the pipeline is launched. See [nextflow.io](https://www.nextflow.io/) for the latest installation instructions.
+The `czbiohub/sc2-illumina-pipeline` pipeline uses Nextflow, which must be present on the system where the pipeline is launched. See [nextflow.io](https://www.nextflow.io/) for the latest installation instructions.
 
 You can also install Nextflow using Bioconda:
 
@@ -29,7 +29,7 @@ conda env create -f environment.yaml
 
 ## Pipeline code
 
-Nextflow will automatically fetch the pipeline code from GitHub if `czbiohub/sc2-msspe-bioinfo` is specified as the pipeline name.
+Nextflow will automatically fetch the pipeline code from GitHub if `czbiohub/sc2-illumina-pipeline` is specified as the pipeline name.
 
 -------------
 

@@ -1,4 +1,4 @@
-# czbiohub/sc2-msspe-bioinfo bug report
+# czbiohub/sc2-illumina-pipeline bug report
 
 Hi there!
 
