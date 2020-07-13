@@ -121,8 +121,6 @@ Use this to specify the BED file with the enrichment/amplification primers used 
 --primers data/nCoV-2019.bed
 ```
 
-By default, the file used will be [`data/SARS-COV-2_spikePrimers.bed`](../data/SARS-COV-2_spikePrimers.bed).
-
 ### `--ref`
 
 Use this to specify the path to the SARS-CoV-2 reference genome, which will be used for alignment and downstream consensus-calling and variant-calling.

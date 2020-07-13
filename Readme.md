@@ -25,6 +25,7 @@ For generating consensus genomes from reads:
 nextflow run czbiohub/sc2-msspe-bioinfo -profile docker \
     --reads '[s3://]path/to/reads/*_R{1,2}_001.fastq.gz*' \
     --kraken2_db '[s3://]path/to/kraken2db' \
+    --primers 'path/to/primers.bed' \
     --outdir '[s3://]path/to/outdir'
 ```
 
