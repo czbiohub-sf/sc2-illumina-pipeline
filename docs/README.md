@@ -1,6 +1,6 @@
 # Documentation
 
-1. [Installation](docs/installation.md)
-2. [Running the pipeline](docs/running.md)
-3. [Pipeline overview](docs/overview.md)
-4. [Output](docs/output.md)
+1. [Installation](installation.md)
+2. [Running the pipeline](running.md)
+3. [Pipeline overview](overview.md)
+4. [Output](output.md)
