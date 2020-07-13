@@ -20,6 +20,7 @@ def helpMessage() {
       --exclude_samples             comma-separated string of samples to exclude from analysis
       --single_end [bool]           Specifies that the input is single-end reads
       --skip_trim_adapters [bool]   Skip trimming of illumina adapters. (NOTE: this does NOT skip the step for trimming spiked primers)
+      --skip_filter_ref             Skip host-filtering.
       --maxNs                       Max number of Ns to allow assemblies to pass QC
       --minLength                   Minimum base pair length to allow assemblies to pass QC
       --no_reads_quast              Run QUAST without aligning reads
