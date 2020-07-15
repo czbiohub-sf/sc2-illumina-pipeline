@@ -1,0 +1,6 @@
+work/*
+.nextflow/*
+.nextflow*
+.github
+.idea/*
+results/*

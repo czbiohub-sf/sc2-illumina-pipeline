@@ -9,7 +9,7 @@ def helpMessage() {
 
     Mandatory arguments:
       -profile                      Configuration profile to use. Can use multiple (comma separated)
-                                    Available: conda, docker, singularity, awsbatch, test and more.
+				    Available: conda, docker, singularity, awsbatch, test and more.
       --reads                       Path to reads, must be in quotes
       --primers                     Path to BED file of primers (default: data/SARS-COV-2_spikePrimers.bed)
       --ref                         Path to FASTA reference sequence (default: data/MN908947.3.fa)
@@ -319,7 +319,7 @@ process trimPrimers {
 }
 
 trimmed_bam_ch.into { quast_bam; consensus_bam; stats_bam;
-                     call_variants_bam; combined_variants_bams }
+		     call_variants_bam; combined_variants_bams }
 
 process makeConsensus {
   tag { sampleName }
@@ -343,7 +343,7 @@ process makeConsensus {
 }
 
 
-consensus_fa.into { quast_ch; stats_fa; merge_fastas_ch; realign_fa }
+consensus_fa.into { quast_ch; stats_fa; merge_fastas_ch; realign_fa; vadr_ch }
 merge_fastas_ch = merge_fastas_ch.map { it[1] }
 
 process quast {
@@ -392,9 +392,9 @@ process callVariants {
     script:
     """
     samtools mpileup -u -d 0 -t AD -f ${ref_fasta} ${in_bams} |
-        bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - |
-        bcftools view -i 'DP>=${params.minDepth}' \
-        > ${sampleName}.vcf
+	bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - |
+	bcftools view -i 'DP>=${params.minDepth}' \
+	> ${sampleName}.vcf
     bgzip ${sampleName}.vcf
     tabix ${sampleName}.vcf.gz
     bcftools stats ${sampleName}.vcf.gz > ${sampleName}.bcftools_stats
@@ -471,11 +471,11 @@ process combinedVariants {
     bcftools merge \$(printf "%s\n" ${vcfs}) | bcftools query -f '%CHROM\\t%POS\\n' > variant_positions.txt
     split -e -n l/${task.cpus} variant_positions.txt split_regions_
     ls split_regions_* |
-        parallel -I % -j ${Math.ceil(task.cpus/2) as int} \
-        'samtools mpileup -u -d 0 -t DP,AD -f ${ref_fasta} \
-        -l % ${in_bams} |
-        bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
-        > %.vcf'
+	parallel -I % -j ${Math.ceil(task.cpus/2) as int} \
+	'samtools mpileup -u -d 0 -t DP,AD -f ${ref_fasta} \
+	-l % ${in_bams} |
+	bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
+	> %.vcf'
     bcftools concat split_regions_*.vcf > combined.vcf
     """
 }
@@ -562,6 +562,26 @@ process multiqc {
     """
 }
 
+if (!params.vadr_model) {
+    vadr_ch = Channel.empty()
+}
+
+process vadr {
+    publishDir "${params.outdir}/vadr", mode: 'copy'
+    label 'process_medium'
+
+    input:
+    path(vadr_model)
+    tuple(sampleName, path(consensus_fa)) from vadr_ch
+
+    output:
+    path("vadr/*")
+
+    script:
+    """
+    v-annotate.pl -r -s --nomisc --lowsimterm 2 --mxsize 64000 --mdir ${vadr_model} --mkey NC_045512 --fstlowthr 0.0 --alt_fail lowscore,fsthicnf,fstlocnf --lowsc 0.75 ${consensus_fa}  vadr
+    """
+}
 
 // Check file extension
 def hasExtension(it, extension) {
