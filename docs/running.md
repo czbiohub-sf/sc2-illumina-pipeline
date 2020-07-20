@@ -59,7 +59,7 @@ NXF_OPTS='-Xms1g -Xmx4g'
 For generating consensus genomes from reads:
 
 ```{sh}
-nextflow run czbiohub/sc2-illumina-pipeline -profile docker \
+nextflow run czbiohub/sc2-illumina-pipeline -profile artic,docker \
     --reads '[s3://]path/to/reads/*_R{1,2}_001.fastq.gz*' \
     --kraken2_db '[s3://]path/to/kraken2db' \
     --outdir '[s3://]path/to/outdir'
@@ -97,6 +97,10 @@ If `-profile` is not specified at all the pipeline will be run locally and expec
   * Pulls software from DockerHub: [`czbiohub/sc2-msspe`](http://hub.docker.com/r/czbiohub/sc2-msspe/)
 * `test`
   * A profile with a complete configuration for automated testing
+* `artic`
+  * A profile to run the pipeline for ARTIC V3 data.
+* `msspe`
+  * A profile to run the pipeline for MSSPE data.
 
 ### `--reads`
 
