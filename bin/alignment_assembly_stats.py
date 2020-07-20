@@ -22,7 +22,6 @@ parser.add_argument("--vcf", help="reference SNPs")
 parser.add_argument("--primervcf")
 parser.add_argument("--neighborvcf")
 parser.add_argument("--neighborfasta")
-parser.add_argument("--clades")
 parser.add_argument("--out_prefix")
 parser.add_argument("--reads", nargs="+")
 args = parser.parse_args()
@@ -132,11 +131,6 @@ if args.primervcf:
     stats = {**stats, **countVCF(args.primervcf, 'primer_snps', 'primer_mnps', 'primer_indels', stats)}
 if args.neighborvcf:
     stats = {**stats, **countVCF(args.neighborvcf, 'new_snps', 'new_mnps', 'new_indels', stats)}
-if args.clades:
-    stats["clade"] = []
-    with open(args.clades) as f:
-        for line in f:
-            stats["clade"].append(line.strip())
 
 with open(args.out_prefix + ".stats.json", "w") as f:
     json.dump(stats, f, indent=2)
