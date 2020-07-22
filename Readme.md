@@ -31,6 +31,29 @@ nextflow run czbiohub/sc2-illumina-pipeline -profile docker \
 
 The kraken2db can be downloaded from https://genexa.ch/sars2-bioinformatics-resources/.
 
+
+# Running the pipeline with weblogs enabled
+
+To run the consensus genome [pipeline](https://github.com/czbiohub/sc2-illumina-pipeline), use the [`run nextflow pipeline`](run_nextflow_pipeline.py) wrapper script. The arguments for that script are passed directly to the nextflow pipeline. Internally, that wrapper script just adds some arguments for running the pipeline on the appropriate AWS Batch queue, and in a way that the covidhub db can track the results.
+
+An example of how to run that script:
+```
+python run_nextflow_pipeline.py -resume \
+    --reads 's3://path/to/reads/*_R{1,2}_001.fastq.gz*' \
+    --kraken2_db 's3://czb-covid-results/kraken2db/kraken2_h+v_20200319/' \
+    --outdir 's3://path/to/results' \
+    --primers '/path/to/primers.bed' \
+    --exclude_samples 'Undetermined_S0'
+```
+
+The specific arguments that the wrapper script provides internally are:
+- `aws.region`
+- `process.executor`
+- `process.queue`
+- `aws.batch.cliPath`
+- `weblog.url`
+- `bucket-dir`
+
 # Testing
 
 Simple test to make sure things aren't broken:
