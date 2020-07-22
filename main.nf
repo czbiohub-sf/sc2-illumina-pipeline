@@ -49,7 +49,6 @@ multiqc_config = file(params.multiqc_config, checkIfExists: true)
 
 ref_fasta = file(params.ref, checkIfExists: true)
 ref_host = file(params.ref_host, checkIfExists: true)
-ref_gb = file(params.ref_gb, checkIfExists: true)
 primer_bed = file(params.primers, checkIfExists: true)
 
 if (params.readPaths) {
