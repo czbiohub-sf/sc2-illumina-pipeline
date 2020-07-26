@@ -83,9 +83,6 @@ Use this parameter to choose a configuration profile. Profiles can give configur
 
 If `-profile` is not specified at all the pipeline will be run locally and expects all software to be install and available on the `PATH`.
 
-* `awsbatch`
-  * a configuration profile to run the pipeline using AWS Batch, specific to CZ Biohub AWS
-  * This profile will also store a weblog with run metadata.
 * `conda`
   * a generic configuration profile to be used with [conda](https://conda.io/docs/)
   * pulls most software from [Bioconda](https://bioconda.github.io/)
@@ -241,15 +238,6 @@ Minimum allele frequency to call a consensus at a position using `ivar consensus
 ### `--minDepth`
 
 Minimum depth at a position for an allele to be called. This is set to `10` by default, so if less than 10 reads align to a position, `N` will be called at that position.
-
-## AWS Batch specific parameters
-Running the pipeline on AWS Batch requires a couple of specific parameters to be set according to your AWS Batch configuration. Please use the `-awsbatch` profile and then specify all of the following parameters.
-### `--awsqueue`
-The JobQueue that you intend to use on AWS Batch. If you are running with CZB credentials, the default queue will work.
-### `--awsregion`
-The AWS region to run your job in. Default is set to `us-west-2` but can be adjusted to your needs.
-
-Please make sure to also set the `-w/--work-dir` and `--outdir` parameters to a S3 storage bucket of your choice - you'll get an error message notifying you if you didn't.
 
 ## Variant calling
 

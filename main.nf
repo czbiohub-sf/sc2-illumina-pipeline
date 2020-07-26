@@ -9,7 +9,7 @@ def helpMessage() {
 
     Mandatory arguments:
       -profile                      Configuration profile to use. Can use multiple (comma separated)
-                                    Available: conda, docker, singularity, awsbatch, test and more.
+                                    Available: conda, docker, singularity, test and more.
       --reads                       Path to reads, must be in quotes
       --primers                     Path to BED file of primers (default: data/SARS-COV-2_spikePrimers.bed)
       --ref                         Path to FASTA reference sequence (default: data/MN908947.3.fa)
@@ -31,10 +31,6 @@ def helpMessage() {
       --outdir                      The output directory where the results will be saved
       -name                         Name for the pipeline run. If not specified, Nextflow will automatically generate a random mnemonic.
       -resume                       Use cached results
-
-    AWSBatch options:
-      --awsqueue                    The AWSBatch JobQueue that needs to be set when running on AWSBatch
-      --awsregion                   The AWS Region for your AWS Batch job to run on
     """.stripIndent()
 }
 
