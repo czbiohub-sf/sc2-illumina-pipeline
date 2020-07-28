@@ -20,7 +20,7 @@ def helpMessage() {
       --exclude_samples             comma-separated string of samples to exclude from analysis
       --single_end [bool]           Specifies that the input is single-end reads
       --skip_trim_adapters [bool]   Skip trimming of illumina adapters. (NOTE: this does NOT skip the step for trimming spiked primers)
-      --skip_filter_ref             Skip host-filtering.
+      --prefilter_host_reads        Prefilter host reads and save the fastqs.
       --maxNs                       Max number of Ns to allow assemblies to pass QC
       --minLength                   Minimum base pair length to allow assemblies to pass QC
       --no_reads_quast              Run QUAST without aligning reads
@@ -72,7 +72,7 @@ reads_ch = reads_ch.filter { !exclude_samples.contains(it[0]) }
 reads_ch.into { unaligned_reads; stats_reads; ercc_in}
 reads_ch = unaligned_reads
 
-if (params.skip_filter_ref) {
+if (!params.prefilter_host_reads) {
     // skip trimming
     reads_to_remove_host_in = Channel.empty()
 } else {
@@ -81,10 +81,10 @@ if (params.skip_filter_ref) {
     reads_ch = Channel.empty()
 }
 
-process filterRefReads {
+process prefilterHostReads {
     tag { sampleName }
     label 'process_large'
-    publishDir "${params.outdir}/filtered-reads"
+    publishDir "${params.outdir}/host-subtracted-reads"
 
     input:
     path(ref_host)

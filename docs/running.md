@@ -14,7 +14,7 @@
 	- [`--exclude_samples`](#--exclude_samples)
 	- [`--single_end`](#--single_end)
 	- [`--skip_trim_adapters`](#--skip_trim_adapters)
-	- [`--skip_filter_ref`](#--skip_filter_ref)
+	- [`--prefilter_host_reads`](#--prefilter_host_reads)
 	- [`--maxNs`](#--maxns)
 	- [`--minLength`](#--minlength)
 	- [`--no_reads_quast`](#--no_reads_quast)
@@ -168,9 +168,9 @@ Use this to specify that the reads are single-end.
 
 Use this to skip trimming with Trim Galore. This is useful if you are running on a set of reads that have already been adapter-trimmed. This will __not__ skip primer trimming.
 
-### `--skip_filter_ref`
+### `--prefilter_host_reads`
 
-Use this to skip host-filtering. This is useful to speed up the pipeline for ARTIC read data.
+Prefilter host reads, and save the resulting fastqs. This is useful when you need fastqs that have been filtered of human reads, but still contain reads from other pathogens besides SARS-CoV-2. By default, this is enabled when `-profile artic`, but disabled when `-profile msspe`.
 
 ### `--maxNs`
 
