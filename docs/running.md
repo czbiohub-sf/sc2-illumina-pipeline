@@ -170,7 +170,7 @@ Use this to skip trimming with Trim Galore. This is useful if you are running on
 
 ### `--prefilter_host_reads`
 
-Prefilter host reads, and save the resulting fastqs. This is useful when you need fastqs that have been filtered of human reads, but still contain reads from other pathogens besides SARS-CoV-2. By default, this is enabled when `-profile artic`, but disabled when `-profile msspe`.
+Prefilter host reads, and save the resulting fastqs. This is useful when you need fastqs that have been filtered of human reads, but still contain reads from other pathogens besides SARS-CoV-2. By default, this is disabled when `-profile artic`, but enabled when `-profile msspe`.
 
 ### `--maxNs`
 
