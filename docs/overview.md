@@ -2,7 +2,7 @@
 <!-- MarkdownTOC -->
 
 - [Processes](#processes)
-	- [`filterRefReads`](#filterrefreads)
+	- [`prefilterHostReads`](#prefilterhostreads)
 	- [`quantifyERCCs`](#quantifyerccs)
 	- [`filterReads`](#filterreads)
 	- [`trimReads`](#trimreads)
@@ -21,9 +21,13 @@
 <!-- /MarkdownTOC -->
 ## Processes
 
-### `filterRefReads`
+### `prefilterHostReads`
 
-Filters host reads by mapping with `minimap2` to the file given with `--ref_host` and keeping unmapped reads. This process can be skipped with the flag `--skip_filter_ref`. The filtered reads will be output into the folder `filtered-reads`. These reads are send to [`filterReads`](#filterreads).
+Filters host reads by mapping with `minimap2` to the file given with `--ref_host` and keeping unmapped reads. This process is optional; enable it with the flag `--prefilter_host_reads`. The filtered reads will be output into the folder `host-subtracted-reads`. These reads are sent to [`filterReads`](#filterreads).
+
+This step may be computationally expensive. If you only need the SARS-CoV-2 reads, and don't care about reads from other pathogens, you can use the fastqs output from `filterReads` instead.
+
+By default, this step is skipped for `-profile artic`, but enabled for `-profile msspe`.
 
 ### `quantifyERCCs`
 
@@ -32,6 +36,8 @@ Quantify ERCC reads by mapping with `minimap2` to the file given with `--ercc_fa
 ### `filterReads`
 
 Filter for only SARS-CoV-2 reads. This is accomplished by first mapping with `minimap2` to the file given with `--ref` and only keeping mapped reads. These reads are then run through `kraken2` against the database provided by `--kraken2_db`. Only reads that are assigned uniquely to SARS-CoV-2 are kept. These reads are sent to [`trimReads`](#trimreads).
+
+When the option `--save_sars2_filtered_reads` is enabled, the fastqs of filtered reads are saved to `filtered-sars2-reads`. By default, this option is enabled when `-profile artic`, but disabled when `-profile msspe`.
 
 ### `trimReads`
 

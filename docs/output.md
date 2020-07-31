@@ -55,12 +55,16 @@ outdir
 ├── coverage-plots
 │   ├── sample1.depths.png
 │   └── ...
+├── host-subtracted-reads			# optional
+│   ├── sample1_covid_no_host_1.fq.gz
+│   ├── sample1_covid_no_host_2.fq.gz
+│   └── ...
 ├── ercc-stats
 │   ├── sample1.ercc_stats
 │   └── ...
 ├── filtered-sars2-reads			# optional
-│   ├── sample1_covid_1_val_1.fq.gz
-│   ├── sample1_covid_2_val_2.fq.gz
+│   ├── sample1_covid_1.fq.gz
+│   ├── sample1_covid_2.fq.gz
 │   └── ...
 ├── sample-variants
 │   ├── sample1.bcftools_stats
@@ -149,9 +153,13 @@ Line plots of coverage for each sample.
 
 The outputs of `samtools stats` on the alignments to the file `--ercc_fasta`.
 
+## `host-subtracted-reads/`
+
+This folder is created when the flag `--prefilter_host_reads` is set. By default, it is disabled when `-profile artic`, but enabled when `-profile msspe`. It contains untrimmed reads that don't map to the host genome.
+
 ## `filtered-sars2-reads/`
 
-This folder is only created when the flag `--save_sars2_filtered_reads` is set. It contains untrimmed reads that are host-filtered and map to the reference genome.
+This folder is created when the flag `--save_sars2_filtered_reads` is set. By default, it is enabled when `-profile artic`, but disabled when `-profile msspe`. It contains untrimmed reads that map to the reference genome, and filtered of reads that map to host or other viruses.
 
 ## `sample-variants/`
 
