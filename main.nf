@@ -386,7 +386,7 @@ process callVariants {
     // NOTE: we use samtools instead of bcftools mpileup because bcftools 1.9 ignores -d0
     script:
     """
-    samtools mpileup -u -d 0 -t AD -f ${ref_fasta} ${in_bams} |
+    samtools mpileup -u -Q ${params.ivarQualThreshold} -d 0 -t AD -f ${ref_fasta} ${in_bams} |
         bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - |
         bcftools view -i 'DP>=${params.minDepth}' \
         > ${sampleName}.vcf
@@ -468,7 +468,7 @@ process combinedVariants {
     ls split_regions_* |
         parallel -I % -j ${Math.ceil(task.cpus/2) as int} \
         'samtools mpileup -u -d 0 -t DP,AD -f ${ref_fasta} \
-        -l % ${in_bams} |
+        -Q ${params.ivarQualThreshold} -l % ${in_bams} |
         bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
         > %.vcf'
     bcftools concat split_regions_*.vcf > combined.vcf
