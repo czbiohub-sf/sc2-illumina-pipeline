@@ -372,7 +372,6 @@ process quast {
 process callVariants {
     tag { sampleName }
     label 'process_pileup'
-    publishDir "${params.outdir}/sample-variants", mode: 'copy'
 
     input:
     tuple(sampleName, path(in_bams)) from call_variants_bam
