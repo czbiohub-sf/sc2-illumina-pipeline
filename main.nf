@@ -379,18 +379,35 @@ process callVariants {
     path(ref_fasta)
 
     output:
-    tuple(sampleName, path("${sampleName}.vcf.gz")) into (stats_vcf, individual_vcfs)
-    path("${sampleName}.bcftools_stats") into bcftools_stats_ch
-    path("${sampleName}.vcf.gz.tbi")
+    tuple(sampleName, path("${sampleName}.full.vcf.gz"), path("${sampleName}.full.vcf.gz.tbi")) into (full_vcf_ch, individual_vcfs)
 
     // NOTE: we use samtools instead of bcftools mpileup because bcftools 1.9 ignores -d0
     script:
     """
-    samtools mpileup -u -Q ${params.ivarQualThreshold} -d 0 -t AD -f ${ref_fasta} ${in_bams} |
-        bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - |
-        bcftools view -i 'DP>=${params.minDepth}' \
-        > ${sampleName}.vcf
-    bgzip ${sampleName}.vcf
+    samtools mpileup -aa -u -Q ${params.ivarQualThreshold} -d 0 -t AD -f ${ref_fasta} ${in_bams} |
+        bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} - \
+        > ${sampleName}.full.vcf
+    bgzip ${sampleName}.full.vcf
+    tabix ${sampleName}.full.vcf.gz
+    """
+}
+
+process filterVariants {
+    tag { sampleName }
+    label 'process_small'
+    publishDir "${params.outdir}/sample-variants", mode: 'copy'
+
+    input:
+    tuple(sampleName, path(fullVcf), path(fullTbi)) from full_vcf_ch
+
+    output:
+    tuple(sampleName, path("${sampleName}.vcf.gz")) into stats_vcf
+    path("${sampleName}.bcftools_stats") into bcftools_stats_ch
+    path("${sampleName}.vcf.gz.tbi")
+
+    script:
+    """
+    bcftools view -c 1 -i 'DP>=${params.minDepth}' -Oz -o ${sampleName}.vcf.gz ${fullVcf}
     tabix ${sampleName}.vcf.gz
     bcftools stats ${sampleName}.vcf.gz > ${sampleName}.bcftools_stats
     """
@@ -438,22 +455,12 @@ process computeStats {
     """
 }
 
-if (!params.joint_variant_calling) {
-    combined_variants_bams = Channel.empty()
-    individual_vcfs = Channel.empty()
-} else {
-    combined_variants_bams = combined_variants_bams.map { it[1] }.collect()
-    individual_vcfs = individual_vcfs.map { it[1] }.collect()
-}
-
 process combinedVariants {
     publishDir "${params.outdir}", mode: 'copy'
-    label 'process_large'
+    label 'process_small'
 
     input:
-    path(in_bams) from combined_variants_bams
-    path(vcfs) from individual_vcfs
-    path(ref_fasta)
+    path(vcfs) from individual_vcfs.map{ it[1] }.collect()
 
     output:
     path("combined.vcf") into combined_variants_vcf
@@ -462,16 +469,9 @@ process combinedVariants {
     script:
     """
     printf "%s\\n" ${vcfs} | xargs -I % tabix %
-    printf "%s\\n" ${in_bams} | xargs -I % samtools index %
-    bcftools merge \$(printf "%s\n" ${vcfs}) | bcftools query -f '%CHROM\\t%POS\\n' > variant_positions.txt
-    split -e -n l/${task.cpus} variant_positions.txt split_regions_
-    ls split_regions_* |
-        parallel -I % -j ${Math.ceil(task.cpus/2) as int} \
-        'samtools mpileup -u -d 0 -t DP,AD -f ${ref_fasta} \
-        -Q ${params.ivarQualThreshold} -l % ${in_bams} |
-        bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} -v - \
-        > %.vcf'
-    bcftools concat split_regions_*.vcf > combined.vcf
+    bcftools merge \$(printf "%s\n" ${vcfs}) |
+        bcftools annotate -x INFO - |
+        bcftools view -c 1 - > combined.vcf
     """
 }
 

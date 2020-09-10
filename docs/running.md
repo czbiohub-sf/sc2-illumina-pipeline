@@ -32,7 +32,6 @@
 	- [`--awsregion`](#--awsregion)
 - [Variant calling](#variant-calling)
 	- [`--bcftoolsCallTheta`](#--bcftoolscalltheta)
-	- [`--joint_variant_calling`](#--joint_variant_calling)
 - [Other command line parameters](#other-command-line-parameters)
 	- [`-name`](#-name)
 	- [`-resume`](#-resume)
@@ -244,10 +243,6 @@ Minimum depth at a position for an allele to be called. This is set to `10` by d
 ### `--bcftoolsCallTheta`
 
 Mutation rate for `bcftools call`. This is .0006 by default.
-
-### `--joint_variant_calling`
-
-Create a joint VCF. This is off by default since it takes a long time.
 
 ## Other command line parameters
 
