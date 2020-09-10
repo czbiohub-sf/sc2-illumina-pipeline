@@ -1,4 +1,4 @@
-FROM nfcore/base:1.9
+FROM nfcore/base:1.10.2
 LABEL authors="Jack Kamm and Samantha Hao" \
       description="Docker image containing all software requirements for the nf-core/msspe pipeline"
 
@@ -11,6 +11,3 @@ ENV PATH /opt/conda/envs/sc2-msspe/bin/:$PATH
 
 # Dump the details of the installed packages to a file for posterity
 RUN conda env export --name nf-core-msspe-1.0dev > nf-core-msspe-1.0dev.yaml
-
-# Install baltic
-RUN pip install git+git://github.com/evogytis/baltic.git
