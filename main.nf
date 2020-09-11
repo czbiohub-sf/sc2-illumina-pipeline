@@ -522,7 +522,8 @@ process filterAssemblies {
     script:
     """
     filter_assemblies.py \
-	--max_n ${params.maxNs} --min_len ${params.minLength} \
+	--min_len ${params.minLength} \
+        --max_ref_snps ${params.maxRefSnps} --max_ambiguous ${params.maxAmbiguous} \
 	--stats ${merged_stats} --fasta ${merged_assemblies} \
 	--out_prefix filtered
     """

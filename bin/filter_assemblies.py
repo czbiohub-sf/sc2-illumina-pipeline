@@ -6,8 +6,9 @@ import pandas as pd
 from Bio import SeqIO
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--max_n', type=int)
 parser.add_argument('--min_len', type=int)
+parser.add_argument('--max_ref_snps', type=int)
+parser.add_argument('--max_ambiguous', type=int)
 parser.add_argument('--stats')
 parser.add_argument('--fasta')
 parser.add_argument('--vcf')
@@ -18,7 +19,9 @@ stats_df = pd.read_csv(args.stats, sep="\t")
 
 filtered_rows = []
 for _, row in stats_df.iterrows():
-    if row["n_missing"] <= args.max_n and row["n_actg"] >= args.min_len:
+    if (row["n_actg"] >= args.min_len and
+        row["ref_snps"] <= args.max_ref_snps and
+        row["n_ambiguous"] <= args.max_ambiguous):
         filtered_rows.append(row)
 if filtered_rows:
     filtered_rows = pd.DataFrame(filtered_rows)
