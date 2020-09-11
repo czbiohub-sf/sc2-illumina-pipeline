@@ -474,7 +474,6 @@ process combinedVariants {
     """
 }
 
-
 process mergeAllAssemblies {
     publishDir "${params.outdir}", mode: 'copy'
     label 'process_tiny'
@@ -517,8 +516,8 @@ process filterAssemblies {
     path(merged_assemblies) from merged_assemblies_ch
 
     output:
-    path("filtered.stats.tsv")
-    path("filtered.fa") into nextstrain_ch
+    path("filtered.stats.tsv") into filtered_stats_ch
+    path("filtered.fa")
 
     script:
     """
@@ -526,6 +525,39 @@ process filterAssemblies {
 	--max_n ${params.maxNs} --min_len ${params.minLength} \
 	--stats ${merged_stats} --fasta ${merged_assemblies} \
 	--out_prefix filtered
+    """
+}
+
+process snpsDf {
+    label = 'process_small'
+
+    input:
+    path(vcf) from combined_variants_vcf
+
+    output:
+    path("snps_long.csv") into snps_csv_ch
+
+    script:
+    """
+    make_snps_dataframe.py --in_vcf ${vcf} --out_csv snps_long.csv
+    """
+}
+
+process qcTreeMap {
+    publishDir "${params.outdir}", mode: 'copy'
+    label = 'process_small'
+
+    input:
+    path(snps_csv) from snps_csv_ch
+    path(filtered_stats_tsv) from filtered_stats_ch
+
+    output:
+    path("snps_treemap_filtered.svg")
+    path("snps_treemap_combined.svg")
+
+    script:
+    """
+    plot_qc_treemap.R ${snps_csv} ${filtered_stats_tsv} snps_treemap
     """
 }
 

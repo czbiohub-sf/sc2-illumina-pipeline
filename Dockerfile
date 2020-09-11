@@ -11,3 +11,7 @@ ENV PATH /opt/conda/envs/sc2-msspe/bin/:$PATH
 
 # Dump the details of the installed packages to a file for posterity
 RUN conda env export --name nf-core-msspe-1.0dev > nf-core-msspe-1.0dev.yaml
+
+# Install R, ggtree, aplots
+RUN apt update && apt install -y r-base
+RUN Rscript  -e "install.packages(c('BiocManager', 'aplot')); BiocManager::install('ggtree')"
