@@ -27,6 +27,9 @@ In the output directory specified by `--outdir`, the following folders and files
 outdir
 ├── combined.fa
 ├── filtered.fa
+├── combined.vcf
+├── snps_treemap_combined.svg
+├── snps_treemap_filtered.svg
 ├── MultiQC
 │   ├── multiqc_data
 │   └── multiqc_plots
@@ -83,7 +86,17 @@ A multi-FASTA file containing all consensus sequences.
 
 ## `filtered.fa`
 
-A multi-FASTA file containing only sequences that pass filtering by `--maxNs` and `--minLength`.
+A multi-FASTA file containing only sequences that pass filtering.
+
+## `combined.vcf`
+
+A VCF of variants in all samples.
+
+## `snps_treemap_{combined,filtered}.svg`
+
+A heatmap of SNP allele frequencies, with neighbor joining tree of the
+samples. 2 SVGs are created, for the full sample set, and for the
+samples passing filters.
 
 ## `MultiQC/`
 

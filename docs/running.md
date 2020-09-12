@@ -15,7 +15,6 @@
 	- [`--single_end`](#--single_end)
 	- [`--skip_trim_adapters`](#--skip_trim_adapters)
 	- [`--prefilter_host_reads`](#--prefilter_host_reads)
-	- [`--maxNs`](#--maxns)
 	- [`--minLength`](#--minlength)
 	- [`--no_reads_quast`](#--no_reads_quast)
 	- [`--ercc_fasta`](#--ercc_fasta)
@@ -171,25 +170,37 @@ Use this to skip trimming with Trim Galore. This is useful if you are running on
 
 Prefilter host reads, and save the resulting fastqs. This is useful when you need fastqs that have been filtered of human reads, but still contain reads from other pathogens besides SARS-CoV-2. By default, this is disabled when `-profile artic`, but enabled when `-profile msspe`.
 
-### `--maxNs`
-
-Specify an integer for maximum N bases allowed for a consensus genome to pass filtering.
-
-```bash
---maxNs 1000
-```
-
-By default, this is set to `100`.
-
 ### `--minLength`
 
 Specify an integer for the minimum non-ambiguous (ACTG) bases needed for a consensus genome to pass filtering.
 
 ```bash
---minLength 29000
+--minLength 27500
 ```
 
-By default, this is set to `25000`.
+By default, this is set to `27500`.
+
+### `--maxRefSnps`
+
+Integer giving the maximum number of SNPs from reference to pass
+filtering.
+
+```bash
+--maxRefSnps 30
+```
+
+By default, this is `30`.
+
+### `--maxAmbiguous`
+
+Integer giving the maximum number of ambiguous (polymorphic) sites to
+pass filtering.
+
+```bash
+--maxAmbiguous 50
+```
+
+Default is `50`.
 
 ### `--no_reads_quast`
 
