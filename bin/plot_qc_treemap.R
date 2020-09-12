@@ -12,8 +12,8 @@ snps_csv <- args[1]
 stats_tsv <- args[2]
 out_svg_prefix <- args[3]
 
-snps_df <- read.csv(snps_csv)
-stats_df <- read.csv(stats_tsv, sep="\t")
+snps_df <- read.csv(snps_csv, stringsAsFactors=F)
+stats_df <- read.csv(stats_tsv, sep="\t", stringsAsFactors=F)
 
 snps_df %>%
   dplyr::select(sample, pos, gt) %>%
