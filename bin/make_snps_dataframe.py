@@ -29,5 +29,6 @@ for i, rec in enumerate(pysam.VariantFile(args.in_vcf)):
                 "ad1": ad1
             })
 
-snps_df = pd.DataFrame(snps_df)
+snps_df = pd.DataFrame(
+    snps_df, columns=["sample", "index", "pos", "gt", "ad0", "ad1"])
 snps_df.to_csv(args.out_csv, index=False, na_rep="NA")
