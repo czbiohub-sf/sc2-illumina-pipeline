@@ -142,29 +142,26 @@ if (hasExtension(params.kraken2_db, 'gz')) {
   }
 }
 
+ercc_fasta = file(params.ercc_fasta, checkIfExists: true)
+
 process quantifyERCCs {
   tag {sampleName}
   publishDir "${params.outdir}/ercc-stats", mode: 'copy'
   label 'process_medium'
 
   input:
-  path(params.ercc_fasta)
+  path(ercc_fasta)
   tuple(sampleName, path(reads)) from ercc_in
 
   output:
   tuple(sampleName, path("${sampleName}.ercc_stats")) into ercc_out
 
   script:
-  if (params.ercc_fasta != "")
-      """
-      minimap2 -t ${task.cpus-1} -ax sr ${params.ercc_fasta} ${reads} |
-          samtools view -@ ${task.cpus-1} -bo ercc_mapped.bam
-      samtools stats -@ ${task.cpus-1} ercc_mapped.bam > ${sampleName}.ercc_stats
-      """
-  else
-      """
-      touch ${sampleName}.ercc_stats
-      """
+  """
+  minimap2 -t ${task.cpus-1} -ax sr ${ercc_fasta} ${reads} |
+    samtools view -@ ${task.cpus-1} -bo ercc_mapped.bam
+  samtools stats -@ ${task.cpus-1} ercc_mapped.bam > ${sampleName}.ercc_stats
+  """
 }
 
 process filterReads {
