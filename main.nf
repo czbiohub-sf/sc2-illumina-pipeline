@@ -157,11 +157,16 @@ process quantifyERCCs {
   tuple(sampleName, path("${sampleName}.ercc_stats")) into ercc_out
 
   script:
-  """
-  minimap2 -t ${task.cpus-1} -ax sr ${ercc_fasta} ${reads} |
-    samtools view -@ ${task.cpus-1} -bo ercc_mapped.bam
-  samtools stats -@ ${task.cpus-1} ercc_mapped.bam > ${sampleName}.ercc_stats
-  """
+  if (params.skip_erccs)
+      """
+      touch ${sampleName}.ercc_stats
+      """
+  else
+      """
+      minimap2 -t ${task.cpus-1} -ax sr ${ercc_fasta} ${reads} |
+          samtools view -@ ${task.cpus-1} -bo ercc_mapped.bam
+      samtools stats -@ ${task.cpus-1} ercc_mapped.bam > ${sampleName}.ercc_stats
+      """
 }
 
 process filterReads {
