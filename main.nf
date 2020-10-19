@@ -319,7 +319,27 @@ process trimPrimers {
 }
 
 trimmed_bam_ch.into { quast_bam; consensus_bam; stats_bam;
-                     call_variants_bam; combined_variants_bams }
+                     call_variants_bam; combined_variants_bams;
+                     depth_bam;}
+
+process samtoolsDepth {
+  tag { sampleName }
+  publishDir "${params.outdir}/samtools-depth/", mode: 'copy'
+  label 'process_small'
+
+  input:
+  tuple(sampleName, path(bam)) from depth_bam
+  path(ref_fasta)
+
+  output:
+  tuple(sampleName, path("${sampleName}.depth.txt")) into depth_out
+
+  script:
+  """
+  samtools index ${bam}
+  samtools depth -aa --reference ${ref_fasta} ${bam} > ${sampleName}.depth.txt
+  """
+}
 
 process makeConsensus {
   tag { sampleName }
