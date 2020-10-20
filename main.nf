@@ -337,7 +337,7 @@ process samtoolsDepth {
   script:
   """
   samtools index ${bam}
-  samtools depth -aa --reference ${ref_fasta} ${bam} > ${sampleName}.depth.txt
+  samtools depth -aa -d 0 --reference ${ref_fasta} ${bam} > ${sampleName}.depth.txt
   """
 }
 
