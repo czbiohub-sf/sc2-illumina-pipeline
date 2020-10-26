@@ -22,14 +22,16 @@ files. We are using it on the following types of sequencing data:
 For generating consensus genomes from reads:
 
 ```{sh}
-nextflow run czbiohub/sc2-illumina-pipeline -profile docker \
+nextflow run czbiohub/sc2-illumina-pipeline -profile artic,docker \
     --reads '[s3://]path/to/reads/*_R{1,2}_001.fastq.gz*' \
     --kraken2_db '[s3://]path/to/kraken2db' \
-    --primers 'path/to/primers.bed' \
     --outdir '[s3://]path/to/outdir'
 ```
 
 The kraken2db can be downloaded from https://genexa.ch/sars2-bioinformatics-resources/.
+
+Replace `-profile artic` with `-profile msspe` if using MSSPE
+sequencing. See the documentation for more details.
 
 # Testing
 
