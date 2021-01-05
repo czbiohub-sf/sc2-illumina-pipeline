@@ -69,8 +69,9 @@ if (params.readPaths) {
 exclude_samples = params.exclude_samples.split(",")
 reads_ch = reads_ch.filter { !exclude_samples.contains(it[0]) }
 
-reads_ch.into { unaligned_reads; stats_reads; ercc_in}
+reads_ch.into { unaligned_reads; stats_reads; ercc_in; n_samples }
 reads_ch = unaligned_reads
+n_samples = n_samples.count().val.toInteger()
 
 if (!params.prefilter_host_reads) {
     // skip trimming
@@ -479,12 +480,33 @@ process computeStats {
     """
 }
 
+process mergeVcfs {
+    label 'process_small'
+
+    input:
+    path(vcfs) from individual_vcfs.map{ it[1] }.collect()
+
+    output:
+    path("combined_all_sites.vcf.gz") into combined_all_sites
+
+    script:
+    if (n_samples > 1)
+        """
+        printf "%s\\n" ${vcfs} | xargs -I % tabix %
+        bcftools merge \$(printf "%s\n" ${vcfs}) -Oz -o combined_all_sites.vcf.gz
+        """
+    else
+        """
+        cp ${vcfs} combined_all_sites.vcf.gz
+        """
+}
+
 process combinedVariants {
     publishDir "${params.outdir}", mode: 'copy'
     label 'process_small'
 
     input:
-    path(vcfs) from individual_vcfs.map{ it[1] }.collect()
+    path(vcf) from combined_all_sites
 
     output:
     path("combined.vcf") into combined_variants_vcf
@@ -492,9 +514,7 @@ process combinedVariants {
     // NOTE: we use samtools instead of bcftools mpileup because bcftools 1.9 ignores -d0
     script:
     """
-    printf "%s\\n" ${vcfs} | xargs -I % tabix %
-    bcftools merge \$(printf "%s\n" ${vcfs}) |
-        bcftools annotate -x INFO - |
+    bcftools annotate -x INFO ${vcf} |
         bcftools view -c 1 - > combined.vcf
     """
 }
@@ -567,6 +587,10 @@ process snpsDf {
     """
     make_snps_dataframe.py --in_vcf ${vcf} --out_csv snps_long.csv
     """
+}
+
+if (n_samples < 3) {
+    snps_csv_ch = Channel.empty()
 }
 
 process qcTreeMap {
