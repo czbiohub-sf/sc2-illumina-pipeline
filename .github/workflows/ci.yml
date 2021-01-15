@@ -16,8 +16,9 @@ jobs:
         nxf_ver: ['19.10.0', '']
         profile_flags: [
         'test',
-        'test --skip_trim_adapters',
-        'test --save_sars2_filtered_reads',
+        'test_msspe',
+        'test_msspe --skip_trim_adapters',
+        'test_msspe --save_sars2_filtered_reads',
         'test_fasta_reads',
         'test_single_end',
         ]
