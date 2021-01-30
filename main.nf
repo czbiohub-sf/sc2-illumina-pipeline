@@ -602,8 +602,8 @@ process qcTreeMap {
     path(filtered_stats_tsv) from filtered_stats_ch
 
     output:
-    path("snps_treemap_filtered.svg")
-    path("snps_treemap_combined.svg")
+    path("snps_treemap_filtered.pdf")
+    path("snps_treemap_combined.pdf")
 
     script:
     """
