@@ -10,18 +10,18 @@ args <- commandArgs(trailingOnly=TRUE)
 
 snps_csv <- args[1]
 stats_tsv <- args[2]
-out_svg_prefix <- args[3]
+out_pdf_prefix <- args[3]
 
-combined_svg <- paste(out_svg_prefix, "_combined.svg", sep="")
-filtered_svg <- paste(out_svg_prefix, "_filtered.svg", sep="")
+combined_pdf <- paste(out_pdf_prefix, "_combined.pdf", sep="")
+filtered_pdf <- paste(out_pdf_prefix, "_filtered.pdf", sep="")
 
 snps_df <- read.csv(snps_csv, stringsAsFactors=F)
 stats_df <- read.csv(stats_tsv, sep="\t", stringsAsFactors=F)
 
 if (nrow(snps_df) == 0) {
   # empty file
-  write.table(data.frame(), combined_svg, col.names=F)
-  write.table(data.frame(), filtered_svg, col.names=F)
+  write.table(data.frame(), combined_pdf, col.names=F)
+  write.table(data.frame(), filtered_pdf, col.names=F)
 } else {
   snps_df %>%
     dplyr::select(sample, pos, gt) %>%
@@ -41,10 +41,10 @@ if (nrow(snps_df) == 0) {
     nj() ->
     nj_tree
 
-  plot_qc_treemap <- function(keep_samples, out_svg) {
+  plot_qc_treemap <- function(keep_samples, out_pdf) {
     if (length(keep_samples) <= 1) {
       # empty file
-      write.table(data.frame(), out_svg, col.names=F)
+      write.table(data.frame(), out_pdf, col.names=F)
       return()
     }
 
@@ -55,7 +55,7 @@ if (nrow(snps_df) == 0) {
 
     if (length(keep_pos) == 0) {
       # empty file
-      write.table(data.frame(), out_svg, col.names=F)
+      write.table(data.frame(), out_pdf, col.names=F)
       return()
     }
 
@@ -74,14 +74,14 @@ if (nrow(snps_df) == 0) {
       geom_tile() ->
       p_heatmap
 
-    svg(out_svg,
+    pdf(out_pdf,
         width=min(19, max(12, .14 * length(keep_pos))),
         height=max(8, .14 * length(keep_samples)))
     p_heatmap %>% insert_left(p_tree, width=.1) %>% print()
     dev.off()
   }
 
-  plot_qc_treemap(stats_df$sample_name, filtered_svg)
+  plot_qc_treemap(stats_df$sample_name, filtered_pdf)
 
   gt_mat %>%
     .[,colSums(., na.rm=TRUE) > 1] ->
@@ -93,5 +93,5 @@ if (nrow(snps_df) == 0) {
     keep_combined <- rownames(gt_mat_subset)[rowMeans(is.na(gt_mat_subset)) < 1]
   }
 
-  plot_qc_treemap(keep_combined, combined_svg)
+  plot_qc_treemap(keep_combined, combined_pdf)
 }
