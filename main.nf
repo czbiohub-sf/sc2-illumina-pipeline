@@ -409,7 +409,7 @@ process callVariants {
     // NOTE: we use samtools instead of bcftools mpileup because bcftools 1.9 ignores -d0
     script:
     """
-    samtools mpileup -aa -u -Q ${params.ivarQualThreshold} -d 0 -t AD -f ${ref_fasta} ${in_bams} |
+    samtools mpileup -aa -u -Q ${params.ivarQualThreshold} -d 0 -L 1000000 -t AD -f ${ref_fasta} ${in_bams} |
         bcftools call --ploidy 1 -m -P ${params.bcftoolsCallTheta} - \
         > ${sampleName}.full.vcf
     bgzip ${sampleName}.full.vcf
