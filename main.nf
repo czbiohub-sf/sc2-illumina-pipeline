@@ -103,6 +103,9 @@ process prefilterHostReads {
 
 reads_ch = reads_ch.mix(reads_host_removed_out)
 
+kraken2_reads_in = reads_ch
+reads_ch = Channel.empty()
+  
 ercc_fasta = file(params.ercc_fasta, checkIfExists: true)
 
 process quantifyERCCs {
