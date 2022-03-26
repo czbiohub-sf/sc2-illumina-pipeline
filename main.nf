@@ -208,13 +208,9 @@ process filterReads {
 
 	rm paired1.fq.gz paired2.fq.gz
 
-	grep --no-group-separator -A3 "kraken:taxid|2697049" \
-	     ${sampleName}_classified_1.fq \
-	     > ${sampleName}_covid_1.fq || [[ \$? == 1 ]]
+	mv ${sampleName}_classified_1.fq ${sampleName}_covid_1.fq
 
-	grep --no-group-separator -A3 "kraken:taxid|2697049" \
-	     ${sampleName}_classified_2.fq \
-	     > ${sampleName}_covid_2.fq || [[ \$? == 1 ]]
+	mv ${sampleName}_classified_2.fq ${sampleName}_covid_2.fq
 
 	gzip ${sampleName}_covid_1.fq
 	gzip ${sampleName}_covid_2.fq
