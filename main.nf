@@ -16,7 +16,6 @@ def helpMessage() {
       --ref_host                    Path to FASTA for host reference genome (default: data/human_chr1.fa)
 
     Consensus calling options:
-      --kraken2_db                  Path to kraken db (default: "")
       --exclude_samples             comma-separated string of samples to exclude from analysis
       --single_end [bool]           Specifies that the input is single-end reads
       --skip_trim_adapters [bool]   Skip trimming of illumina adapters. (NOTE: this does NOT skip the step for trimming spiked primers)
@@ -104,45 +103,6 @@ process prefilterHostReads {
 
 reads_ch = reads_ch.mix(reads_host_removed_out)
 
-if (params.kraken2_db) {
-  // send reads to kraken, and empty the reads channel
-  kraken2_reads_in = reads_ch
-  reads_ch = Channel.empty()
-  if (hasExtension(params.kraken2_db, 'gz')) {
-    kraken2_db_gz = Channel
-	.fromPath(params.kraken2_db, checkIfExists: true)
-	.ifEmpty { exit 1, "Kraken2 database not found: ${params.kraken2_db}" }
-  } else{
-    kraken2_db = Channel
-	.fromPath(params.kraken2_db, checkIfExists: true)
-	.ifEmpty { exit 1, "Kraken2 database not found: ${params.kraken2_db}" }
-  }
-} else {
-  // skip kraken
-  kraken2_reads_in = Channel.empty()
-  kraken2_db = Channel.empty()
-
-}
-
-if (hasExtension(params.kraken2_db, 'gz')) {
-  process gunzip_kraken_db {
-      tag "$gz"
-      publishDir "${params.outdir}/kraken_db", mode: 'copy'
-
-      input:
-      file gz from kraken2_db_gz
-
-      output:
-      file "${gz.simpleName}" into kraken2_db
-
-      script:
-      // Use tar as the star indices are a folder, not a file
-      """
-      tar -xzvf ${gz}
-      """
-  }
-}
-
 ercc_fasta = file(params.ercc_fasta, checkIfExists: true)
 
 process quantifyERCCs {
@@ -179,7 +139,6 @@ process filterReads {
       saveAs: { params.save_sars2_filtered_reads ? it : null }
 
     input:
-    path(db) from kraken2_db.collect()
     path(ref_fasta)
     tuple(sampleName, file(reads)) from kraken2_reads_in
 
@@ -195,31 +154,9 @@ process filterReads {
        mapped.bam
     rm mapped.bam
 
-    LINES=\$(zcat paired1.fq.gz | wc -l)
-    if [ "\$LINES" -gt 0 ];
-    then
-	kraken2 --db ${db} \
-	  --threads ${task.cpus} \
-	  --report ${sampleName}.kraken2_report \
-	  --classified-out "${sampleName}_classified#.fq" \
-	  --output - \
-	  --memory-mapping --gzip-compressed --paired \
-	  paired1.fq.gz paired2.fq.gz
+    mv paired1.fq.gz ${sampleName}_covid_1.fq.gz
+    mv paired2.fq.gz ${sampleName}_covid_2.fq.gz
 
-	rm paired1.fq.gz paired2.fq.gz
-
-	mv ${sampleName}_classified_1.fq ${sampleName}_covid_1.fq
-
-	mv ${sampleName}_classified_2.fq ${sampleName}_covid_2.fq
-
-	gzip ${sampleName}_covid_1.fq
-	gzip ${sampleName}_covid_2.fq
-
-	rm ${sampleName}_classified_*.fq
-    else
-	mv paired1.fq.gz ${sampleName}_covid_1.fq.gz
-	mv paired2.fq.gz ${sampleName}_covid_2.fq.gz
-    fi
     """
 }
 
